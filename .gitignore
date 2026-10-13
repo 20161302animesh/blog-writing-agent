@@ -1,0 +1,24 @@
+# Allowlist: this folder also holds local experiments, generated posts and run logs.
+# Only the files below are part of the repo.
+/*
+!/.gitignore
+!/.env.example
+!/README.md
+!/pyproject.toml
+!/langgraph.json
+!/blog_agent/
+!/tests/
+!/walkthrough.ipynb
+!/blog_writing_agent_v3_research_finetuned_claude_mod.ipynb
+!/blog_analysis_agent_v1.ipynb
+
+# Never commit secrets
+.env
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.ipynb_checkpoints/
+.langgraph_api/
