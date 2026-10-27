@@ -141,6 +141,7 @@ footer a { color: var(--muted); }
     <ul>
       <li><a href="index.html">Home</a></li>
       <li><a href="docs/how-it-works.html">How it works</a></li>
+      <li><a href="docs/walkthrough.html">Walkthrough</a></li>
       <li><a href="readme.html" aria-current="page">README</a></li>
       <li><a href="https://github.com/20161302animesh/blog-writing-agent">GitHub</a></li>
     </ul>
@@ -346,7 +347,7 @@ llm_with_tools = llm.bind_tools([tool])</pre>
         </div>
         <div class="sub">
           <h3>Guided tour</h3>
-          <p><a href="https://github.com/20161302animesh/blog-writing-agent/blob/main/walkthrough.ipynb">walkthrough.ipynb</a> runs one post step by step, then one end to end. Set <code>LIVE = False</code> to run it offline for free.</p>
+          <p><a href="https://github.com/20161302animesh/blog-writing-agent/blob/main/walkthrough.ipynb">walkthrough.ipynb</a> runs one post step by step, then one end to end. Set <code>LIVE = False</code> to run it offline for free. To read it without running anything, see the <a href="docs/walkthrough.html">walkthrough page</a>.</p>
         </div>
       </section>
 
@@ -389,6 +390,7 @@ llm_with_tools = llm.bind_tools([tool])</pre>
   cli.py                <span class="d">python -m blog_agent</span>
 tests/                  <span class="d">offline tests with fake models and search</span>
 docs/how-it-works.html  <span class="d">visual explainer</span>
+docs/walkthrough.html   <span class="d">the walkthrough as a web page (rebuild: python docs/build_walkthrough.py)</span>
 walkthrough.ipynb       <span class="d">guided tour</span>
 blog_writing_agent_v3_research_finetuned_claude_mod.ipynb  <span class="d">original technical notebook</span>
 blog_analysis_agent_v1.ipynb                              <span class="d">original analysis notebook</span></pre>
