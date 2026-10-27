@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blog Writing Agent README</title>
+<meta name="description" content="Install, configure and run the blog writing agent: settings, CLI flags, the Python API, outputs, project layout and tests.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: reference doc; sticky contents rail on the left, one reading column on the right. Same tokens as index.html. */
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --ink: #17202C;
+  --muted: #5B6573;
+  --line: #D9DEE6;
+  --accent: #2552C4;        /* blue pencil */
+  --accent-soft: #E7EDFB;
+  --haiku: #2F7A57;
+  --sonnet: #95600F;
+  --opus: #6D3FA6;
+  --haiku-soft: #E3F1EA;
+  --sonnet-soft: #F6EBD9;
+  --opus-soft: #EEE6F8;
+  --code-bg: #EEF1F5;
+  --display: "Newsreader", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161D; --surface: #1A2029; --ink: #E4E8EE; --muted: #9AA4B2; --line: #2D3542;
+    --accent: #8AA9F5; --accent-soft: #1F2A44;
+    --haiku: #7FCBA5; --sonnet: #E2B46A; --opus: #C3A2EE;
+    --haiku-soft: #1C2D25; --sonnet-soft: #302616; --opus-soft: #2A2138;
+    --code-bg: #20262F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161D; --surface: #1A2029; --ink: #E4E8EE; --muted: #9AA4B2; --line: #2D3542;
+  --accent: #8AA9F5; --accent-soft: #1F2A44;
+  --haiku: #7FCBA5; --sonnet: #E2B46A; --opus: #C3A2EE;
+  --haiku-soft: #1C2D25; --sonnet-soft: #302616; --opus-soft: #2A2138;
+  --code-bg: #20262F;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 24px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.65 var(--body);
+  padding-inline: 20px;
+  padding-block: calc(28px + env(safe-area-inset-top, 0px)) calc(56px + env(safe-area-inset-bottom, 0px));
+}
+.shell { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
+
+/* top bar */
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; font-size: 0.92rem; }
+.topbar .brand { font: 500 0.95rem/1 var(--mono); color: var(--ink); text-decoration: none; }
+.topbar ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; flex-wrap: wrap; }
+.topbar ul a { color: var(--muted); text-decoration: none; }
+.topbar ul a:hover, .topbar ul a[aria-current="page"] { color: var(--accent); }
+
+.layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 56px; align-items: start; }
+
+/* contents rail */
+.toc { position: sticky; top: calc(24px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; }
+.toc .label { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--line); }
+.toc a { display: block; padding: 4px 0 4px 14px; margin-left: -1px; border-left: 2px solid transparent; color: var(--muted); text-decoration: none; }
+.toc a:hover { color: var(--ink); }
+.toc a.active { color: var(--accent); border-left-color: var(--accent); }
+
+/* content */
+main { display: flex; flex-direction: column; gap: 52px; min-width: 0; max-width: 760px; }
+.doc-head { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1, h2 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2.2rem, 5vw, 3rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.65rem; }
+h3 { font-size: 1.02rem; font-weight: 600; margin: 0; }
+p { margin: 0; }
+.lede { font-size: 1.12rem; color: var(--muted); }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+section { display: flex; flex-direction: column; gap: 16px; }
+.sub { display: flex; flex-direction: column; gap: 12px; }
+.muted { color: var(--muted); }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+.codeblock { position: relative; }
+pre { margin: 0; background: var(--code-bg); border-radius: 4px; padding: 14px 16px; overflow-x: auto; font: 0.84rem/1.6 var(--mono); color: var(--ink); }
+pre .c { color: var(--muted); }
+.copy { position: absolute; top: 8px; right: 8px; font: 500 0.72rem/1 var(--mono); color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 5px 8px; cursor: pointer; }
+.copy:hover { color: var(--accent); border-color: var(--accent); }
+
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.72rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td:first-child { white-space: nowrap; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table.wide { min-width: 600px; }
+
+.chip { display: inline-block; font: 500 0.7rem/1 var(--mono); padding: 4px 7px; border-radius: 3px; letter-spacing: 0.03em; white-space: nowrap; }
+.chip.haiku { color: var(--haiku); background: var(--haiku-soft); }
+.chip.sonnet { color: var(--sonnet); background: var(--sonnet-soft); }
+.chip.opus { color: var(--opus); background: var(--opus-soft); }
+
+.callout { border-left: 2px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 0.93rem; }
+.tree { font: 0.84rem/1.75 var(--mono); }
+.tree .d { color: var(--muted); }
+
+footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 18px; display: flex; gap: 8px 20px; flex-wrap: wrap; justify-content: space-between; }
+footer a { color: var(--muted); }
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; gap: 28px; }
+  .toc { position: static; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .toc ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-left: 0; gap: 0 12px; }
+  .toc a { padding-left: 0; border-left: 0; }
+  .toc a.active { border-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="topbar" aria-label="Main">
+    <a class="brand" href="index.html">blog-writing-agent</a>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="docs/how-it-works.html">How it works</a></li>
+      <li><a href="readme.html" aria-current="page">README</a></li>
+      <li><a href="https://github.com/20161302animesh/blog-writing-agent">GitHub</a></li>
+    </ul>
+  </nav>
+
+  <div class="layout">
+    <aside class="toc" aria-label="Contents">
+      <span class="label">Contents</span>
+      <ol>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#install">Installation</a></li>
+        <li><a href="#config">Configuration</a></li>
+        <li><a href="#cli">Command line</a></li>
+        <li><a href="#python">Python API</a></li>
+        <li><a href="#resume">Resumable runs</a></li>
+        <li><a href="#integrations">Tools and Studio</a></li>
+        <li><a href="#outputs">Outputs</a></li>
+        <li><a href="#layout">Project layout</a></li>
+        <li><a href="#tests">Tests</a></li>
+        <li><a href="#cost">Cost</a></li>
+        <li><a href="#issues">Known issues</a></li>
+      </ol>
+    </aside>
+
+    <main>
+      <header class="doc-head">
+        <span class="eyebrow">README</span>
+        <h1>Blog Writing Agent</h1>
+        <p class="lede">A LangGraph agent, built on Claude and Tavily, that researches, plans, writes, edits and tags blog posts. It writes technical posts and analysis pieces, and saves each one as Markdown with front matter.</p>
+      </header>
+
+      <section id="overview" aria-labelledby="overview-h">
+        <h2 id="overview-h">Overview</h2>
+        <p>Every run follows the same path at the start and end, and picks one of two writing branches in the middle.</p>
+        <div class="scroll">
+<pre>classify -> router -> (research) -+- orchestrator -> [worker x N] -> reducer -> grounding -+- tagger -> save
+                                  +- planner -> writer -> editor --------------------------+</pre>
+        </div>
+        <div class="scroll">
+          <table class="wide">
+            <thead><tr><th>Kind</th><th>For</th><th>How it writes</th></tr></thead>
+            <tbody>
+              <tr><td><b>technical</b></td><td>Engineering, AI, developer tools, tutorials</td><td>Outline of 5–9 sections, parallel section writers with code checks, then an Opus grounding check of cited claims</td></tr>
+              <tr><td><b>analysis</b></td><td>Media, culture, business, opinion</td><td>A thesis and 3–6 argument beats, one writer, then an Opus editor that critiques and revises</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">For the full pipeline, with the model behind each step and the quality checks, see <a href="docs/how-it-works.html">How it works</a>.</p>
+      </section>
+
+      <section id="install" aria-labelledby="install-h">
+        <h2 id="install-h">Installation</h2>
+        <p>You need Python 3.11 or later, an <a href="https://console.anthropic.com/">Anthropic API key</a>, and a <a href="https://tavily.com/">Tavily API key</a>.</p>
+        <div class="codeblock">
+<pre id="c-install">git clone https://github.com/20161302animesh/blog-writing-agent
+cd blog-writing-agent
+python -m venv .venv
+<span class="c"># Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate</span>
+pip install -e .
+cp .env.example .env</pre>
+          <button class="copy" type="button" data-target="c-install">Copy</button>
+        </div>
+        <p>Then open <code>.env</code> and fill in <code>ANTHROPIC_API_KEY</code> and <code>TAVILY_API_KEY</code>.</p>
+        <p class="callout">Install with <code>-e</code> (editable) and run from the project folder. The agent looks for <code>.env</code> next to the package, so a regular <code>pip install .</code> may not find your keys (<a href="https://github.com/20161302animesh/blog-writing-agent/issues/2">issue #2</a>).</p>
+      </section>
+
+      <section id="config" aria-labelledby="config-h">
+        <h2 id="config-h">Configuration</h2>
+        <p>Settings come from <code>.env</code> or your environment. Only the two API keys are required.</p>
+        <div class="scroll">
+          <table class="wide">
+            <thead><tr><th>Variable</th><th>Default</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>ANTHROPIC_API_KEY</code></td><td>required</td><td>Claude access</td></tr>
+              <tr><td><code>TAVILY_API_KEY</code></td><td>required</td><td>Web search</td></tr>
+              <tr><td><code>BLOG_AGENT_OUTPUT_DIR</code></td><td><code>./blog_posts</code></td><td>Where posts are saved</td></tr>
+              <tr><td><code>BLOG_AGENT_QA_DIR</code></td><td><code>./runs</code></td><td>Where per-run QA folders go</td></tr>
+              <tr><td><code>BLOG_AGENT_MAX_CONCURRENCY</code></td><td class="num">3</td><td>Section writers running at once (keeps you under rate limits)</td></tr>
+              <tr><td><code>BLOG_AGENT_GROUNDING_CHECK</code></td><td><code>true</code></td><td>Run the Opus grounding check on technical posts</td></tr>
+              <tr><td><code>BLOG_AGENT_REFUSAL_FALLBACKS</code></td><td><code>true</code></td><td>If Sonnet or Opus refuses a request, retry it on a fallback model</td></tr>
+              <tr><td><code>BLOG_AGENT_&lt;ROLE&gt;_MODEL</code></td><td>see below</td><td>Model for one role</td></tr>
+              <tr><td><code>BLOG_AGENT_&lt;ROLE&gt;_MAX_TOKENS</code></td><td>see below</td><td>Output limit for one role, including thinking</td></tr>
+              <tr><td><code>BLOG_AGENT_&lt;ROLE&gt;_EFFORT</code></td><td>model default</td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code> or <code>max</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="sub">
+          <h3>Roles and default models</h3>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Role</th><th>Model</th><th>Max tokens</th><th>Used for</th></tr></thead>
+              <tbody>
+                <tr><td><code>CLASSIFIER</code></td><td><span class="chip haiku">claude-haiku-5-5</span></td><td class="num">2,048</td><td>Technical or analysis</td></tr>
+                <tr><td><code>ROUTER</code></td><td><span class="chip haiku">claude-haiku-5-5</span></td><td class="num">2,048</td><td>Research mode and queries</td></tr>
+                <tr><td><code>RESEARCH</code></td><td><span class="chip haiku">claude-haiku-5-5</span></td><td class="num">8,192</td><td>Search results into evidence</td></tr>
+                <tr><td><code>PLANNER</code></td><td><span class="chip sonnet">claude-sonnet-5-5</span></td><td class="num">8,192</td><td>Outline or thesis</td></tr>
+                <tr><td><code>WRITER</code></td><td><span class="chip sonnet">claude-sonnet-5-5</span></td><td class="num">16,000</td><td>Sections or the full draft</td></tr>
+                <tr><td><code>EDITOR</code></td><td><span class="chip opus">claude-opus-5-5</span></td><td class="num">16,000</td><td>Grounding check and editing</td></tr>
+                <tr><td><code>TAGGER</code></td><td><span class="chip haiku">claude-haiku-5-5</span></td><td class="num">2,048</td><td>Tags</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted">Example: <code>BLOG_AGENT_EDITOR_MODEL=claude-sonnet-5-5</code> makes editing cheaper. From Python, use <code>Settings.from_env().with_overrides(...)</code>.</p>
+        </div>
+      </section>
+
+      <section id="cli" aria-labelledby="cli-h">
+        <h2 id="cli-h">Command line</h2>
+        <div class="codeblock">
+<pre id="c-cli">python -m blog_agent "Will Indian OTT ever have its Ted Lasso moment?" --kind analysis --words 800 -v</pre>
+          <button class="copy" type="button" data-target="c-cli">Copy</button>
+        </div>
+        <div class="scroll">
+          <table class="wide">
+            <thead><tr><th>Flag</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>--kind auto|technical|analysis</code></td><td>Which branch to use. <code>auto</code> (default) lets a classifier decide.</td></tr>
+              <tr><td><code>--words N</code></td><td>Target length for analysis pieces. Technical posts take their length from the outline.</td></tr>
+              <tr><td><code>--as-of YYYY-MM-DD</code></td><td>Date the research treats as "today". Defaults to today.</td></tr>
+              <tr><td><code>--no-save</code></td><td>Don't write the post to the output folder</td></tr>
+              <tr><td><code>--no-qa</code></td><td>Don't write QA snapshots</td></tr>
+              <tr><td><code>--no-grounding</code></td><td>Skip the technical grounding check</td></tr>
+              <tr><td><code>--checkpoint-db PATH</code></td><td>Save progress to a SQLite file so a failed run can be resumed</td></tr>
+              <tr><td><code>--resume RUN_ID</code></td><td>Continue a failed run. Needs <code>--checkpoint-db</code>.</td></tr>
+              <tr><td><code>--json</code></td><td>Print the full result as JSON</td></tr>
+              <tr><td><code>-v</code></td><td>Log each step as it finishes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="python" aria-labelledby="python-h">
+        <h2 id="python-h">Python API</h2>
+        <div class="codeblock">
+<pre id="c-py">from blog_agent import write_blog
+
+result = write_blog(
+    "How LangGraph checkpointers work",
+    kind="technical",       # "auto" | "technical" | "analysis"
+    target_words=None,      # analysis only
+    save=True,              # write the post to the output folder
+    qa=True,                # write the QA folder
+)
+print(result.title, result.output_path, result.estimated_cost_usd)</pre>
+          <button class="copy" type="button" data-target="c-py">Copy</button>
+        </div>
+        <div class="sub">
+          <h3>What <code>write_blog()</code> returns</h3>
+          <div class="scroll">
+            <table class="wide">
+              <thead><tr><th>Field</th><th>Contents</th></tr></thead>
+              <tbody>
+                <tr><td><code>title</code>, <code>description</code></td><td>Final headline, and a one-sentence summary (the thesis, for analysis pieces)</td></tr>
+                <tr><td><code>markdown</code></td><td>The post with its H1 title, without front matter</td></tr>
+                <tr><td><code>kind</code>, <code>mode</code></td><td>Branch used, and research mode (<code>closed_book</code>, <code>hybrid</code>, <code>open_book</code>)</td></tr>
+                <tr><td><code>tags</code></td><td>5–8 tags</td></tr>
+                <tr><td><code>output_path</code>, <code>qa_dir</code></td><td>Where the post and the QA folder were written</td></tr>
+                <tr><td><code>evidence</code></td><td>The sources the post could cite</td></tr>
+                <tr><td><code>editor_issues</code></td><td>What the editor or grounding check changed, and why</td></tr>
+                <tr><td><code>section_issues</code></td><td>Technical sections still failing their checks after a retry</td></tr>
+                <tr><td><code>warnings</code></td><td>Steps that failed but didn't stop the run</td></tr>
+                <tr><td><code>usage</code>, <code>estimated_cost_usd</code></td><td>Tokens per model, and an estimated cost</td></tr>
+                <tr><td><code>plan</code></td><td>The outline or thesis plan, as a dict</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="resume" aria-labelledby="resume-h">
+        <h2 id="resume-h">Resumable runs</h2>
+        <p>With a checkpoint file, a run that crashes (network error, rate limit) continues where it stopped. Steps that already finished aren't repeated or paid for again.</p>
+        <div class="codeblock">
+<pre id="c-resume">python -m blog_agent "Your topic" --checkpoint-db runs/checkpoints.sqlite
+<span class="c"># ...the run fails and prints its run id...</span>
+python -m blog_agent --resume 20261013-172341_your_topic --checkpoint-db runs/checkpoints.sqlite</pre>
+          <button class="copy" type="button" data-target="c-resume">Copy</button>
+        </div>
+        <div class="codeblock">
+<pre id="c-resume-py">from blog_agent import write_blog, sqlite_checkpointer
+
+with sqlite_checkpointer("runs/checkpoints.sqlite") as cp:
+    result = write_blog("Your topic", checkpointer=cp)
+    <span class="c"># after a failure:</span>
+    result = write_blog("", checkpointer=cp, resume_run_id=run_id)</pre>
+          <button class="copy" type="button" data-target="c-resume-py">Copy</button>
+        </div>
+        <p class="muted">For another checkpointer such as Postgres, pass <code>serde=blog_agent.checkpoint.make_serializer()</code> so saved plans and evidence load back correctly.</p>
+      </section>
+
+      <section id="integrations" aria-labelledby="integrations-h">
+        <h2 id="integrations-h">Tools and Studio</h2>
+        <div class="sub">
+          <h3>As a tool for another agent</h3>
+<pre>from blog_agent import as_tool
+
+tool = as_tool()        # a LangChain tool named "write_blog_post"
+llm_with_tools = llm.bind_tools([tool])</pre>
+        </div>
+        <div class="sub">
+          <h3>In LangGraph Studio</h3>
+          <p>Run <code>langgraph dev</code> in the project folder (needs <code>langgraph-cli[inmem]</code>). It reads <code>langgraph.json</code> and loads the graph. Start a run with <code>{"topic": "...", "kind": "auto"}</code>.</p>
+        </div>
+        <div class="sub">
+          <h3>Guided tour</h3>
+          <p><a href="https://github.com/20161302animesh/blog-writing-agent/blob/main/walkthrough.ipynb">walkthrough.ipynb</a> runs one post step by step, then one end to end. Set <code>LIVE = False</code> to run it offline for free.</p>
+        </div>
+      </section>
+
+      <section id="outputs" aria-labelledby="outputs-h">
+        <h2 id="outputs-h">Outputs</h2>
+        <p>Each run gets an id like <code>20261013-172341_how_langgraph_checkpointers_work</code>.</p>
+        <div class="scroll">
+          <table class="wide">
+            <thead><tr><th>File</th><th>Contents</th></tr></thead>
+            <tbody>
+              <tr><td><code>blog_posts/&lt;run_id&gt;.md</code></td><td>The post, with front matter: title, date, kind, description, tags</td></tr>
+              <tr><td><code>runs/&lt;run_id&gt;/NN_&lt;step&gt;.json</code></td><td>What each step changed, and the full state after it. Parallel writers appear as <code>05_worker_task01.json</code>, <code>05_worker_task02.json</code>, …</td></tr>
+              <tr><td><code>v1_draft.md</code>, <code>v2_editor_revision.md</code>, <code>v3_final.md</code></td><td>The draft, the edited version and the final post</td></tr>
+              <tr><td><code>diff_1_draft_to_editor.diff</code></td><td>Every sentence the editor or grounding check changed</td></tr>
+              <tr><td><code>final_state.json</code></td><td>Everything at the end of the run</td></tr>
+              <tr><td><code>error.txt</code></td><td>Only if the run crashed: the error and where it happened</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="layout" aria-labelledby="layout-h">
+        <h2 id="layout-h">Project layout</h2>
+        <div class="scroll">
+<pre class="tree">blog_agent/
+  config.py             <span class="d">Settings: model per role, folders, retries, prices</span>
+  llm.py                <span class="d">The only place that calls Claude; stop-reason checks, fallbacks</span>
+  schemas.py            <span class="d">Evidence, the two plan shapes, BlogResult</span>
+  profiles.py           <span class="d">Router, research and tagger prompts for each kind</span>
+  state.py              <span class="d">Graph state, and the dependencies passed to every step</span>
+  research.py           <span class="d">Tavily search (parallel) and the research step</span>
+  nodes.py              <span class="d">classify, router, tagger, save</span>
+  pipelines/
+    technical.py        <span class="d">orchestrator, workers, reducer, grounding</span>
+    analysis.py         <span class="d">planner, writer, editor</span>
+  graph.py              <span class="d">build_graph(): wires the steps together</span>
+  qa.py                 <span class="d">Per-step snapshots, versions, diffs</span>
+  checkpoint.py         <span class="d">sqlite_checkpointer() for resumable runs</span>
+  api.py                <span class="d">write_blog() and as_tool()</span>
+  cli.py                <span class="d">python -m blog_agent</span>
+tests/                  <span class="d">offline tests with fake models and search</span>
+docs/how-it-works.html  <span class="d">visual explainer</span>
+walkthrough.ipynb       <span class="d">guided tour</span>
+blog_writing_agent_v3_research_finetuned_claude_mod.ipynb  <span class="d">original technical notebook</span>
+blog_analysis_agent_v1.ipynb                              <span class="d">original analysis notebook</span></pre>
+        </div>
+      </section>
+
+      <section id="tests" aria-labelledby="tests-h">
+        <h2 id="tests-h">Tests</h2>
+        <div class="codeblock">
+<pre id="c-tests">pip install -e ".[dev]"
+python -m pytest</pre>
+          <button class="copy" type="button" data-target="c-tests">Copy</button>
+        </div>
+        <p>The 18 tests run both branches end to end with fake models and fake search, so they need no API keys and cost nothing. They also cover the failure paths: search down, editor failing, old news being filtered out, and resuming a crashed run.</p>
+      </section>
+
+      <section id="cost" aria-labelledby="cost-h">
+        <h2 id="cost-h">Cost</h2>
+        <p>A typical post costs $0.20–0.40 in Claude usage and takes 2–4 minutes. Tavily search is billed separately.</p>
+        <div class="scroll">
+          <table class="wide">
+            <thead><tr><th>Sample post</th><th>Kind</th><th>Cost</th></tr></thead>
+            <tbody>
+              <tr><td>Indian Streamers Remake Because It's Cheap Insurance, Not Because They Lack Ideas</td><td>analysis</td><td class="num">$0.22</td></tr>
+              <tr><td>LangGraph Send Fan-Out vs. a Plain Loop: How to Choose</td><td>technical</td><td class="num">$0.33</td></tr>
+              <tr><td>How LangGraph Checkpointers Work: SQLite vs Postgres, and Resuming a Failed Run</td><td>technical</td><td class="num">$0.36</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">To spend less: set <code>BLOG_AGENT_EDITOR_MODEL=claude-sonnet-5-5</code>, or turn off the grounding check with <code>--no-grounding</code>.</p>
+      </section>
+
+      <section id="issues" aria-labelledby="issues-h">
+        <h2 id="issues-h">Known issues</h2>
+        <p>Open bugs and planned improvements are tracked as <a href="https://github.com/20161302animesh/blog-writing-agent/issues">GitHub issues</a>. The ones most likely to affect you:</p>
+        <ul class="plain">
+          <li>A regular (non-editable) install may not find your <code>.env</code> (<a href="https://github.com/20161302animesh/blog-writing-agent/issues/2">#2</a>).</li>
+          <li>If the planner repeats a section number, one of those sections is dropped from the post (<a href="https://github.com/20161302animesh/blog-writing-agent/issues/1">#1</a>).</li>
+          <li>A resumed run reports only the cost of the part it re-ran (<a href="https://github.com/20161302animesh/blog-writing-agent/issues/8">#8</a>).</li>
+        </ul>
+      </section>
+
+      <footer>
+        <span><a href="index.html">blog-writing-agent</a> · <a href="https://github.com/20161302animesh/blog-writing-agent">source on GitHub</a></span>
+        <span>Built with LangGraph, Claude and Tavily</span>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+// Copy buttons: clipboard when allowed, otherwise select the text
+document.querySelectorAll(".copy").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var pre = document.getElementById(btn.dataset.target);
+    function done(label) { btn.textContent = label; setTimeout(function () { btn.textContent = "Copy"; }, 1600); }
+    function selectText() {
+      var range = document.createRange();
+      range.selectNodeContents(pre);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      done("Selected");
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pre.innerText).then(function () { done("Copied"); }, selectText);
+    } else {
+      selectText();
+    }
+  });
+});
+
+// Highlight the current section in the contents rail
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+  if (!("IntersectionObserver" in window)) return;
+  var visible = {};
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    var current = sections.find(function (s) { return s && visible[s.id]; });
+    if (!current) return;
+    links.forEach(function (a) { a.classList.toggle("active", a.getAttribute("href") === "#" + current.id); });
+  }, { rootMargin: "0px 0px -60% 0px" });
+  sections.forEach(function (s) { if (s) observer.observe(s); });
+})();
+</script>
+</body>
+</html>

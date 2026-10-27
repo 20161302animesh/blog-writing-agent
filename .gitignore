@@ -5,6 +5,7 @@
 !/.env.example
 !/README.md
 !/index.html
+!/readme.html
 !/pyproject.toml
 !/langgraph.json
 !/blog_agent/

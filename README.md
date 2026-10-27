@@ -33,6 +33,8 @@ print(result.title, result.output_path, result.estimated_cost_usd)
 
 ## Learn more
 
+Project site: https://20161302animesh.github.io/blog-writing-agent/ (landing page, [README](https://20161302animesh.github.io/blog-writing-agent/readme.html), and [how it works](https://20161302animesh.github.io/blog-writing-agent/docs/how-it-works.html)).
+
 - [docs/how-it-works.html](docs/how-it-works.html): a one-page visual explainer of the pipeline, the two writing branches and the quality checks. Download it and open it in a browser.
 - [walkthrough.ipynb](walkthrough.ipynb): a guided tour that runs the analysis pipeline one node at a time, then the technical pipeline end to end. It includes the QA output, resuming a failed run, and how to extend the package. Set `LIVE = False` to run it offline for free.
 - [blog_agent/README.md](blog_agent/README.md): configuration, module layout and entry points (Python, CLI, LangChain tool, LangGraph Studio).
