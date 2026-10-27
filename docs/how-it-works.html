@@ -1,0 +1,277 @@
+<title>Blog Writing Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column, widened once for the pipeline diagram; nodes styled like galley slips marked in editor's blue pencil. */
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --ink: #17202C;
+  --muted: #5B6573;
+  --line: #D9DEE6;
+  --accent: #2552C4;        /* blue pencil */
+  --accent-soft: #E7EDFB;
+  --haiku: #2F7A57;
+  --sonnet: #95600F;
+  --opus: #6D3FA6;
+  --haiku-soft: #E3F1EA;
+  --sonnet-soft: #F6EBD9;
+  --opus-soft: #EEE6F8;
+  --code-bg: #EEF1F5;
+  --display: "Newsreader", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161D; --surface: #1A2029; --ink: #E4E8EE; --muted: #9AA4B2; --line: #2D3542;
+    --accent: #8AA9F5; --accent-soft: #1F2A44;
+    --haiku: #7FCBA5; --sonnet: #E2B46A; --opus: #C3A2EE;
+    --haiku-soft: #1C2D25; --sonnet-soft: #302616; --opus-soft: #2A2138;
+    --code-bg: #20262F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161D; --surface: #1A2029; --ink: #E4E8EE; --muted: #9AA4B2; --line: #2D3542;
+  --accent: #8AA9F5; --accent-soft: #1F2A44;
+  --haiku: #7FCBA5; --sonnet: #E2B46A; --opus: #C3A2EE;
+  --haiku-soft: #1C2D25; --sonnet-soft: #302616; --opus-soft: #2A2138;
+  --code-bg: #20262F;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.6 var(--body);
+  padding-inline: 20px;
+  padding-block: 40px 64px;
+}
+.page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+.prose { max-width: 680px; }
+
+h1, h2 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.7rem; }
+h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 640px; }
+section { display: flex; flex-direction: column; gap: 18px; }
+.intro { display: flex; flex-direction: column; gap: 14px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: 0.92rem; }
+.facts b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* model chips */
+.chip { display: inline-block; font: 500 0.7rem/1 var(--mono); padding: 4px 7px; border-radius: 3px; letter-spacing: 0.03em; white-space: nowrap; }
+.chip.haiku { color: var(--haiku); background: var(--haiku-soft); }
+.chip.sonnet { color: var(--sonnet); background: var(--sonnet-soft); }
+.chip.opus { color: var(--opus); background: var(--opus-soft); }
+.chip.code { color: var(--muted); background: var(--code-bg); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+
+/* pipeline diagram */
+.flow { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.node {
+  flex: 1 1 150px; min-width: 0;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.node .name { font: 500 0.92rem/1.2 var(--mono); }
+.node .what { font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
+.node.optional { border-style: dashed; }
+.node.edit { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.arrow { align-self: center; color: var(--muted); font-family: var(--mono); flex: 0 0 auto; }
+.down { text-align: center; color: var(--muted); font: 0.8rem/1.2 var(--mono); }
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lane { border: 1px solid var(--line); border-radius: 5px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lane-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.lane-head h3 { font-family: var(--display); font-size: 1.15rem; }
+.lane-head span { font-size: 0.8rem; color: var(--muted); }
+.lane .node { flex: 0 0 auto; }
+.workers { display: flex; gap: 6px; flex-wrap: wrap; }
+.workers .w { font: 0.72rem/1 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 4px 6px; background: var(--surface); }
+
+/* stage list */
+.stages { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.stage { display: grid; grid-template-columns: 150px 1fr auto; gap: 6px 18px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.stage .name { font: 500 0.95rem/1.3 var(--mono); }
+.stage p { color: var(--ink); min-width: 0; }
+.stage p .note { color: var(--muted); }
+
+/* comparison */
+.compare { width: 100%; border-collapse: collapse; font-size: 0.95rem; min-width: 560px; }
+.compare th, .compare td { text-align: left; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.compare th { font: 500 0.75rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.compare td:first-child { color: var(--muted); width: 22%; }
+.scroll { overflow-x: auto; }
+
+/* checks */
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 32px; }
+.check { display: flex; flex-direction: column; gap: 4px; padding-left: 14px; border-left: 2px solid var(--accent); }
+.check p { color: var(--muted); font-size: 0.93rem; }
+
+/* outputs + run */
+.outputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.outputs > div { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+pre { margin: 0; background: var(--code-bg); border-radius: 4px; padding: 14px 16px; overflow-x: auto; font: 0.83rem/1.55 var(--mono); color: var(--ink); }
+pre .c { color: var(--muted); }
+.files { list-style: none; margin: 0; padding: 0; font-size: 0.9rem; display: flex; flex-direction: column; gap: 6px; }
+.files code { color: var(--accent); }
+footer { color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 720px) {
+  .lanes, .checks, .outputs { grid-template-columns: 1fr; }
+  .stage { grid-template-columns: 1fr auto; }
+  .stage p { grid-column: 1 / -1; }
+  .flow { padding: 14px; }
+  .row { flex-direction: column; }
+  .row .arrow { transform: rotate(90deg); }
+}
+</style>
+
+<div class="page">
+
+  <header class="intro">
+    <span class="eyebrow">blog_agent · LangGraph + Claude + Tavily</span>
+    <h1>Blog Writing Agent</h1>
+    <p class="lede">You give it a topic. It researches the web, plans the piece, writes it, has an editor check it against the sources, tags it, and saves a ready-to-publish Markdown post.</p>
+    <div class="facts">
+      <span>Two kinds of post: <b>technical</b> and <b>analysis</b></span>
+      <span><b>2–4 minutes</b> per post</span>
+      <span>About <b>$0.20–0.40</b> per post</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="flow-h">
+    <h2 id="flow-h">The pipeline</h2>
+    <p class="prose">Every post starts and ends the same way. In the middle, the topic goes down one of two writing branches, because a tutorial and an opinion piece need different structures.</p>
+    <div class="legend">
+      <span><span class="chip haiku">Haiku</span> fast, cheap steps</span>
+      <span><span class="chip sonnet">Sonnet</span> planning and writing</span>
+      <span><span class="chip opus">Opus</span> editing and fact-checking</span>
+      <span><span class="chip code">code</span> no model call</span>
+    </div>
+
+    <div class="flow" role="img" aria-label="Pipeline: classify, router, optional research, then either the technical branch (orchestrator, parallel section workers, reducer, grounding check) or the analysis branch (planner, writer, editor), then tagger and save.">
+      <div class="row">
+        <div class="node"><span class="name">classify</span><span class="what">Technical or analysis?</span><span><span class="chip haiku">Haiku</span></span></div>
+        <span class="arrow">→</span>
+        <div class="node"><span class="name">router</span><span class="what">Does it need research? Writes the search queries.</span><span><span class="chip haiku">Haiku</span></span></div>
+        <span class="arrow">→</span>
+        <div class="node optional"><span class="name">research</span><span class="what">Tavily search, then clean evidence. Skipped for evergreen topics.</span><span><span class="chip haiku">Haiku</span></span></div>
+      </div>
+      <div class="down">↓ branch by kind ↓</div>
+      <div class="lanes">
+        <div class="lane">
+          <div class="lane-head"><h3>Technical</h3><span>engineering, AI, dev tools</span></div>
+          <div class="node"><span class="name">orchestrator</span><span class="what">Outline of 5–9 sections, each with a goal and bullets</span><span><span class="chip sonnet">Sonnet</span></span></div>
+          <div class="node"><span class="name">workers × N</span><span class="what">One writer per section, running in parallel</span>
+            <div class="workers" aria-hidden="true"><span class="w">§1</span><span class="w">§2</span><span class="w">§3</span><span class="w">§4</span><span class="w">…</span></div>
+            <span><span class="chip sonnet">Sonnet</span></span></div>
+          <div class="node"><span class="name">reducer</span><span class="what">Joins the sections in order</span><span><span class="chip code">code</span></span></div>
+          <div class="node edit"><span class="name">grounding</span><span class="what">Checks cited claims against the sources and makes small fixes</span><span><span class="chip opus">Opus</span></span></div>
+        </div>
+        <div class="lane">
+          <div class="lane-head"><h3>Analysis</h3><span>media, culture, business, opinion</span></div>
+          <div class="node"><span class="name">planner</span><span class="what">A thesis, 3–6 argument beats and the strongest counterpoint</span><span><span class="chip sonnet">Sonnet</span></span></div>
+          <div class="node"><span class="name">writer</span><span class="what">One writer drafts the whole piece, so the argument and voice hold together</span><span><span class="chip sonnet">Sonnet</span></span></div>
+          <div class="node edit"><span class="name">editor</span><span class="what">Checks argument, sources, reasoning and prose, then revises. Code then checks the length.</span><span><span class="chip opus">Opus</span></span></div>
+        </div>
+      </div>
+      <div class="down">↓ both branches ↓</div>
+      <div class="row">
+        <div class="node"><span class="name">tagger</span><span class="what">5–8 specific tags</span><span><span class="chip haiku">Haiku</span></span></div>
+        <span class="arrow">→</span>
+        <div class="node"><span class="name">save</span><span class="what">Markdown post with front matter</span><span><span class="chip code">code</span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="stages-h">
+    <h2 id="stages-h">What each step does</h2>
+    <div class="stages">
+      <div class="stage"><span class="name">classify</span><p>Reads the request and picks the branch. Skipped when you choose the kind yourself.</p><span class="chip haiku">Haiku</span></div>
+      <div class="stage"><span class="name">router</span><p>Picks a research mode: <code>closed_book</code> (no research), <code>hybrid</code> (needs current examples) or <code>open_book</code> (recent news). If research is needed, it writes up to 8–10 targeted queries.</p><span class="chip haiku">Haiku</span></div>
+      <div class="stage"><span class="name">research</span><p>Runs the queries in parallel on Tavily, drops low-value sites (Wikipedia, social media), and keeps up to 20 evidence items. <span class="note">News topics only keep results from the last week.</span></p><span class="chip haiku">Haiku</span></div>
+      <div class="stage"><span class="name">plan</span><p>Technical posts get a section outline; analysis pieces get a thesis and argument beats. Every plan points at the evidence it relies on by number.</p><span class="chip sonnet">Sonnet</span></div>
+      <div class="stage"><span class="name">write</span><p>Technical: one writer per section, in parallel. Analysis: one writer for the whole piece. Facts must come from the evidence and are cited inline.</p><span class="chip sonnet">Sonnet</span></div>
+      <div class="stage"><span class="name">edit</span><p>Opus reads the draft next to the original source text. It removes or softens claims the sources don't support and never adds new facts or links.</p><span class="chip opus">Opus</span></div>
+      <div class="stage"><span class="name">tag &amp; save</span><p>Adds 5–8 tags, drops generic ones like "ai" or "opinion", and writes the post with its title, date, description and tags.</p><span class="chip haiku">Haiku</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="branches-h">
+    <h2 id="branches-h">Two branches, two shapes of writing</h2>
+    <div class="scroll">
+      <table class="compare">
+        <thead><tr><th></th><th>Technical</th><th>Analysis</th></tr></thead>
+        <tbody>
+          <tr><td>Example</td><td>“How LangGraph checkpointers work”</td><td>“Will Indian OTT ever have its Ted Lasso moment?”</td></tr>
+          <tr><td>Plan</td><td>5–9 sections with goals and bullets</td><td>A thesis, 3–6 beats, a counterpoint</td></tr>
+          <tr><td>Writing</td><td>Sections written in parallel</td><td>One writer for the whole piece</td></tr>
+          <tr><td>Review</td><td>Grounding check: small, precise fixes</td><td>Full edit: argument, sources, prose, length</td></tr>
+          <tr><td>Length</td><td>Set by the outline</td><td>700–1000 words unless you ask for a length</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="checks-h">
+    <h2 id="checks-h">How it keeps the writing honest</h2>
+    <div class="checks">
+      <div class="check"><h3>Sources come only from search</h3><p>Evidence the search didn't return is dropped, so the model can't invent a source.</p></div>
+      <div class="check"><h3>Claims are checked against the source text</h3><p>The editor sees what each source actually says, not just a summary of it.</p></div>
+      <div class="check"><h3>Code is checked</h3><p>Python examples must parse and code blocks must close. A failing section is rewritten once with the problems spelled out.</p></div>
+      <div class="check"><h3>Fixes can't add links</h3><p>A grounding fix that introduces a URL outside the evidence is rejected.</p></div>
+      <div class="check"><h3>Cut-off answers are caught</h3><p>A response that hit its token limit or was refused is never passed on as if it were complete.</p></div>
+      <div class="check"><h3>Failures degrade, not crash</h3><p>A failed search or edit adds a warning and the run continues. With a checkpoint file, a crashed run resumes where it stopped.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="run-h">
+    <h2 id="run-h">Run it, and what you get</h2>
+    <div class="outputs">
+      <div>
+        <h3>From the terminal</h3>
+<pre><span class="c"># one-time setup: add ANTHROPIC_API_KEY and TAVILY_API_KEY to .env</span>
+pip install -e .
+python -m blog_agent "Your topic" --kind auto -v</pre>
+        <h3>From Python</h3>
+<pre>from blog_agent import write_blog
+
+result = write_blog("Your topic", kind="analysis",
+                    target_words=800)
+print(result.output_path, result.tags)</pre>
+      </div>
+      <div>
+        <h3>Every run produces</h3>
+        <ul class="files">
+          <li><code>blog_posts/&lt;run_id&gt;.md</code>: the post, with front matter</li>
+          <li><code>runs/&lt;run_id&gt;/NN_&lt;step&gt;.json</code>: what each step changed</li>
+          <li><code>v1_draft.md → v3_final.md</code>: the draft, the edit, the final</li>
+          <li><code>diff_1_draft_to_editor.diff</code>: every sentence the editor changed</li>
+          <li>Token usage per model and an estimated cost</li>
+        </ul>
+        <h3>Other ways in</h3>
+        <ul class="files">
+          <li>As a tool another agent can call: <code>as_tool()</code></li>
+          <li>In LangGraph Studio: <code>langgraph dev</code></li>
+          <li>A guided tour: <code>walkthrough.ipynb</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Code, walkthrough and issues: <a href="https://github.com/20161302animesh/blog-writing-agent">github.com/20161302animesh/blog-writing-agent</a>
+  </footer>
+
+</div>

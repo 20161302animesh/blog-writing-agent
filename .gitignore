@@ -8,6 +8,7 @@
 !/langgraph.json
 !/blog_agent/
 !/tests/
+!/docs/
 !/walkthrough.ipynb
 !/blog_writing_agent_v3_research_finetuned_claude_mod.ipynb
 !/blog_analysis_agent_v1.ipynb
