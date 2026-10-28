@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blog Writing Agent Replay</title>
+<meta name="description" content="Play back real recorded runs of the blog writing agent, step by step: the queries, sources, plan, sections and editor's changes from each run.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a player. Run picker and transport on top, then the pipeline (left) beside an inspector of the selected step (right). Same tokens as the other site pages. */
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --ink: #17202C;
+  --muted: #5B6573;
+  --faint: #A3ABB7;
+  --line: #D9DEE6;
+  --accent: #2552C4;        /* blue pencil */
+  --accent-soft: #E7EDFB;
+  --haiku: #2F7A57;
+  --sonnet: #95600F;
+  --opus: #6D3FA6;
+  --haiku-soft: #E3F1EA;
+  --sonnet-soft: #F6EBD9;
+  --opus-soft: #EEE6F8;
+  --code-bg: #EEF1F5;
+  --strike: #A33A3A;
+  --display: "Newsreader", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161D; --surface: #1A2029; --ink: #E4E8EE; --muted: #9AA4B2; --faint: #5A6472; --line: #2D3542;
+    --accent: #8AA9F5; --accent-soft: #1F2A44;
+    --haiku: #7FCBA5; --sonnet: #E2B46A; --opus: #C3A2EE;
+    --haiku-soft: #1C2D25; --sonnet-soft: #302616; --opus-soft: #2A2138;
+    --code-bg: #20262F; --strike: #E59393;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161D; --surface: #1A2029; --ink: #E4E8EE; --muted: #9AA4B2; --faint: #5A6472; --line: #2D3542;
+  --accent: #8AA9F5; --accent-soft: #1F2A44;
+  --haiku: #7FCBA5; --sonnet: #E2B46A; --opus: #C3A2EE;
+  --haiku-soft: #1C2D25; --sonnet-soft: #302616; --opus-soft: #2A2138;
+  --code-bg: #20262F; --strike: #E59393;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.6 var(--body);
+  padding-inline: 20px;
+  padding-block: calc(28px + env(safe-area-inset-top, 0px)) calc(56px + env(safe-area-inset-bottom, 0px));
+}
+.page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1, h2 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2.1rem, 5vw, 3rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: 0.98rem; font-weight: 600; margin: 0; }
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+button { font: inherit; color: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+
+/* site menu */
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; font-size: 0.92rem; }
+.topbar .brand { font: 500 0.95rem/1 var(--mono); color: var(--ink); text-decoration: none; }
+.topbar ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; flex-wrap: wrap; }
+.topbar ul a { color: var(--muted); text-decoration: none; }
+.topbar ul a:hover, .topbar ul a[aria-current="page"] { color: var(--accent); }
+
+.intro { display: flex; flex-direction: column; gap: 12px; max-width: 760px; }
+.lede { font-size: 1.08rem; color: var(--muted); }
+
+/* chips */
+.chip { display: inline-block; font: 500 0.68rem/1 var(--mono); padding: 4px 6px; border-radius: 3px; letter-spacing: 0.03em; white-space: nowrap; }
+.chip.Haiku { color: var(--haiku); background: var(--haiku-soft); }
+.chip.Sonnet { color: var(--sonnet); background: var(--sonnet-soft); }
+.chip.Opus { color: var(--opus); background: var(--opus-soft); }
+.chip.code { color: var(--muted); background: var(--code-bg); }
+.chip.kind { color: var(--accent); background: var(--accent-soft); }
+
+/* run picker */
+.runs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.run-card {
+  text-align: left; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.run-card:hover { border-color: var(--faint); }
+.run-card[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.run-card .topic { font-family: var(--display); font-size: 1.02rem; line-height: 1.3; }
+.run-card .meta { font: 0.75rem/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pair-note { font-size: 0.85rem; color: var(--muted); }
+
+/* transport */
+.transport { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 0.9rem; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.play { background: var(--accent); border-color: var(--accent); color: var(--bg); min-width: 96px; justify-content: center; font-weight: 500; }
+.btn.play:hover { color: var(--bg); }
+.speed { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.speed button { border: 0; background: var(--bg); padding: 7px 11px; cursor: pointer; font: 500 0.8rem/1 var(--mono); color: var(--muted); }
+.speed button + button { border-left: 1px solid var(--line); }
+.speed button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.clock { margin-left: auto; font: 500 0.9rem/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+.clock b { color: var(--ink); font-weight: 500; }
+
+.timeline { position: relative; height: 34px; }
+.track { position: absolute; inset: 10px 0; border-radius: 3px; background: var(--code-bg); overflow: hidden; }
+.seg { position: absolute; top: 0; bottom: 0; border-right: 1px solid var(--surface); opacity: 0.85; }
+.seg.Haiku { background: var(--haiku); }
+.seg.Sonnet { background: var(--sonnet); }
+.seg.Opus { background: var(--opus); }
+.seg.code { background: var(--faint); }
+.track .rest { position: absolute; top: 0; bottom: 0; right: 0; background: var(--surface); opacity: 0.6; pointer-events: none; }
+.playhead { position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--ink); border-radius: 1px; pointer-events: none; }
+.timeline input[type=range] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.8rem; color: var(--muted); align-items: center; }
+
+/* stage */
+.stage { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; min-width: 0; }
+.panel-title { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; display: block; }
+
+/* pipeline */
+.pipe { display: flex; flex-direction: column; gap: 6px; }
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lane { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--line); border-radius: 5px; padding: 8px; min-width: 0; }
+.lane-name { font: 500 0.68rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.lane[data-state="skipped"] { opacity: 0.45; }
+.join { text-align: center; color: var(--faint); font: 0.75rem/1 var(--mono); }
+.node {
+  width: 100%; text-align: left; cursor: pointer; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg);
+}
+.node .name { font: 500 0.84rem/1.2 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node .time { font: 0.72rem/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--faint); }
+.node[data-state="running"] { border-color: var(--accent); background: var(--accent-soft); }
+.node[data-state="running"] .dot { border-color: var(--accent); background: var(--accent); }
+.node[data-state="done"] .dot { border-color: var(--ink); background: var(--ink); }
+.node[data-state="skipped"] { opacity: 0.45; cursor: default; border-style: dashed; }
+.node[data-state="skipped"] .dot { border-style: dashed; }
+.node[aria-current="true"] { box-shadow: inset 3px 0 0 var(--accent); }
+.workers { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 4px; padding: 0 0 2px 22px; }
+.w { font: 0.68rem/1 var(--mono); text-align: center; padding: 5px 0; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
+.w[data-state="running"] { border-color: var(--accent); color: var(--accent); }
+.w[data-state="done"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .node[data-state="running"] .dot, .w[data-state="running"] { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+}
+
+/* inspector */
+.inspector { display: flex; flex-direction: column; gap: 14px; min-height: 420px; }
+.insp-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.insp-head h2 { font-family: var(--mono); font-size: 1.05rem; font-weight: 500; }
+.insp-status { font: 0.8rem/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.follow { font: 500 0.75rem/1 var(--mono); padding: 5px 8px; border-radius: 3px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; }
+.insp-body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.does { color: var(--muted); font-size: 0.93rem; }
+.working { display: flex; flex-direction: column; gap: 8px; }
+.bar { height: 10px; border-radius: 3px; background: var(--code-bg); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 0.93rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; }
+ol.list, ul.list { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
+.ev { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.ev:last-child { border-bottom: 0; }
+.ev .src { font: 0.72rem/1.3 var(--mono); color: var(--muted); }
+.ev a { font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
+.ev a:hover { text-decoration: underline; }
+.ev p { font-size: 0.88rem; color: var(--muted); }
+.scroll-box { max-height: 460px; overflow: auto; padding-right: 4px; }
+.thesis { font-family: var(--display); font-size: 1.2rem; line-height: 1.4; border-left: 2px solid var(--accent); padding-left: 14px; }
+.ref { font: 0.72rem/1 var(--mono); color: var(--accent); white-space: nowrap; }
+.tasks { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.tasks th, .tasks td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tasks th { font: 500 0.68rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tasks td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sec { border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.sec-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.sec-head span { font: 0.72rem/1 var(--mono); color: var(--muted); white-space: nowrap; }
+.sec p { font-size: 0.88rem; color: var(--muted); }
+.notes { display: flex; flex-direction: column; gap: 8px; }
+.note { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; color: var(--accent); font-size: 0.9rem; line-height: 1.45; }
+.note::before { content: "✎"; }
+.change { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--bg); border-radius: 4px; font-family: var(--display); font-size: 0.98rem; line-height: 1.45; }
+.change .before { color: var(--strike); text-decoration: line-through; text-decoration-thickness: 1px; }
+.change .after { color: var(--ink); }
+.change .lbl { font: 500 0.66rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); text-decoration: none; display: block; margin-bottom: 2px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font: 0.82rem/1 var(--mono); padding: 6px 9px; border-radius: 3px; background: var(--accent-soft); color: var(--accent); }
+.paper { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; font-family: var(--display); font-size: 1rem; line-height: 1.6; display: flex; flex-direction: column; gap: 10px; }
+.paper h3 { font-family: var(--display); font-size: 1.3rem; line-height: 1.25; }
+.paper h4 { font-family: var(--display); font-size: 1.08rem; margin: 4px 0 0; }
+.paper a { color: inherit; text-decoration-color: var(--accent); }
+.fm { font: 0.78rem/1.6 var(--mono); color: var(--muted); background: var(--code-bg); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.request { display: flex; flex-direction: column; gap: 12px; }
+.request .topic { font-family: var(--display); font-size: 1.3rem; line-height: 1.35; }
+
+/* log */
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.log li { border-bottom: 1px solid var(--line); }
+.log li:last-child { border-bottom: 0; }
+.log button { width: 100%; text-align: left; background: none; border: 0; padding: 8px 0; cursor: pointer; display: grid; grid-template-columns: 52px 110px minmax(0, 1fr); gap: 10px; font-size: 0.88rem; align-items: baseline; }
+.log button:hover .what { color: var(--accent); }
+.log .t { font: 0.78rem/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.log .k { font: 500 0.8rem/1.2 var(--mono); }
+.log .what { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { color: var(--muted); font-size: 0.9rem; }
+
+.fine { font-size: 0.85rem; color: var(--muted); }
+footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 18px; display: flex; gap: 8px 20px; flex-wrap: wrap; justify-content: space-between; }
+footer a { color: var(--muted); }
+
+@media (max-width: 980px) {
+  .runs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stage { grid-template-columns: 1fr; }
+  .inspector { min-height: 0; }
+}
+@media (max-width: 520px) {
+  .runs { grid-template-columns: 1fr; }
+  .clock { margin-left: 0; width: 100%; }
+  .log button { grid-template-columns: 46px minmax(0, 1fr); }
+  .log .what { grid-column: 2; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <nav class="topbar" aria-label="Main">
+    <a class="brand" href="../index.html">blog-writing-agent</a>
+    <ul>
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="how-it-works.html">How it works</a></li>
+      <li><a href="demo.html" aria-current="page">Replay</a></li>
+      <li><a href="walkthrough.html">Walkthrough</a></li>
+      <li><a href="../readme.html">README</a></li>
+      <li><a href="https://github.com/20161302animesh/blog-writing-agent">GitHub</a></li>
+    </ul>
+  </nav>
+
+  <header class="intro">
+    <span class="eyebrow">Replay of recorded runs</span>
+    <h1>Watch the agent write a post</h1>
+    <p class="lede">Pick a run and press Play. Every query, source, plan, section and edit you see comes from a real run's saved snapshots, and the timings are real, sped up. Nothing is generated in your browser.</p>
+  </header>
+
+  <section aria-labelledby="pick-h" style="display:flex;flex-direction:column;gap:10px">
+    <h2 id="pick-h" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Choose a run</h2>
+    <div class="runs" id="runs" role="radiogroup" aria-label="Recorded runs"></div>
+    <p class="pair-note" id="pair-note"></p>
+  </section>
+
+  <div class="transport">
+    <div class="controls">
+      <button class="btn play" id="play" type="button">Play</button>
+      <button class="btn" id="step" type="button">Next step</button>
+      <button class="btn" id="restart" type="button">Restart</button>
+      <div class="speed" role="group" aria-label="Playback speed" id="speed">
+        <button type="button" data-speed="1">1×</button>
+        <button type="button" data-speed="4">4×</button>
+        <button type="button" data-speed="12">12×</button>
+      </div>
+      <span class="clock" id="clock" aria-live="off"><b>0:00</b> / 0:00</span>
+    </div>
+    <div class="timeline">
+      <div class="track" id="track"><div class="rest" id="rest"></div></div>
+      <div class="playhead" id="playhead"></div>
+      <input type="range" id="seek" min="0" max="100" step="0.1" value="0" aria-label="Position in the run">
+    </div>
+    <div class="legend">
+      <span><span class="chip Haiku">Haiku</span> fast steps</span>
+      <span><span class="chip Sonnet">Sonnet</span> planning, writing</span>
+      <span><span class="chip Opus">Opus</span> editing</span>
+      <span><span class="chip code">code</span> no model</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="panel">
+      <span class="panel-title">Pipeline</span>
+      <div class="pipe" id="pipe">
+        <button class="node" type="button" data-key="classify"><span class="dot"></span><span class="name">classify</span><span class="time"></span></button>
+        <button class="node" type="button" data-key="router"><span class="dot"></span><span class="name">router</span><span class="time"></span></button>
+        <button class="node" type="button" data-key="research"><span class="dot"></span><span class="name">research</span><span class="time"></span></button>
+        <div class="join">↓</div>
+        <div class="lanes">
+          <div class="lane" id="lane-technical">
+            <span class="lane-name">technical</span>
+            <button class="node" type="button" data-key="orchestrator"><span class="dot"></span><span class="name">orchestrator</span><span class="time"></span></button>
+            <button class="node" type="button" data-key="workers"><span class="dot"></span><span class="name">workers</span><span class="time"></span></button>
+            <div class="workers" id="worker-chips"></div>
+            <button class="node" type="button" data-key="reducer"><span class="dot"></span><span class="name">reducer</span><span class="time"></span></button>
+            <button class="node" type="button" data-key="grounding"><span class="dot"></span><span class="name">grounding</span><span class="time"></span></button>
+          </div>
+          <div class="lane" id="lane-analysis">
+            <span class="lane-name">analysis</span>
+            <button class="node" type="button" data-key="planner"><span class="dot"></span><span class="name">planner</span><span class="time"></span></button>
+            <button class="node" type="button" data-key="writer"><span class="dot"></span><span class="name">writer</span><span class="time"></span></button>
+            <button class="node" type="button" data-key="editor"><span class="dot"></span><span class="name">editor</span><span class="time"></span></button>
+          </div>
+        </div>
+        <div class="join">↓</div>
+        <button class="node" type="button" data-key="tagger"><span class="dot"></span><span class="name">tagger</span><span class="time"></span></button>
+        <button class="node" type="button" data-key="save"><span class="dot"></span><span class="name">save</span><span class="time"></span></button>
+      </div>
+    </div>
+
+    <div class="panel inspector" aria-live="polite">
+      <div class="insp-head">
+        <h2 id="insp-title">request</h2>
+        <div class="insp-status" id="insp-status"></div>
+      </div>
+      <div class="insp-body" id="insp-body"></div>
+    </div>
+  </div>
+
+  <section class="panel" aria-labelledby="log-h">
+    <span class="panel-title" id="log-h">Run log</span>
+    <ol class="log" id="log"></ol>
+  </section>
+
+  <p class="fine">Replays use data extracted from the runs' QA snapshots by <code>docs/build_demo_data.py</code>. Step times come from when each snapshot was written. Parallel section writers are recorded as finishing together, so they're shown that way. To write your own post, see the <a href="../readme.html#install">installation steps</a>.</p>
+
+  <footer>
+    <span><a href="../index.html">blog-writing-agent</a> · <a href="https://github.com/20161302animesh/blog-writing-agent">source on GitHub</a></span>
+    <span>Built with LangGraph, Claude and Tavily</span>
+  </footer>
+</div>
+
+<script src="demo-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var RUNS = window.DEMO_RUNS || [];
+
+  var DOES = {
+    request: "The request the agent was given.",
+    classify: "Decides whether this is a technical post or an analysis piece.",
+    router: "Chooses how much research is needed and writes the search queries.",
+    research: "Searches the web with Tavily, drops low-value sites, and turns results into numbered evidence.",
+    orchestrator: "Outlines the post: 5–9 sections, each with a goal, target length and the evidence it relies on.",
+    workers: "Writes every section in parallel, up to 3 at a time. Broken code is rewritten once.",
+    reducer: "Joins the sections in order. No model call.",
+    grounding: "Checks each cited claim against the source text and makes small, precise fixes.",
+    planner: "Works out the thesis, the argument beats and the strongest counterpoint.",
+    writer: "Drafts the whole piece in one pass, so the argument and voice hold together.",
+    editor: "Checks argument, sources, reasoning and prose against the original source text, then revises. Code then checks the length.",
+    tagger: "Picks 5–8 specific tags and drops generic ones.",
+    save: "Writes the Markdown file with front matter."
+  };
+  var MODES = {
+    closed_book: "No research needed: an evergreen topic.",
+    hybrid: "Needs current examples and data to be credible.",
+    open_book: "About recent news: only sources from the last week."
+  };
+  var MODEL_OF = { workers: "Sonnet" };
+
+  var state = { run: 0, t: 0, playing: false, speed: 4, pinned: null, lastKey: null, lastNodeState: null };
+  var timeline = [];   // ordered nodes for the selected run, including a synthetic "workers" node
+  var byKey = {};
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmt(sec) {
+    sec = Math.max(0, sec);
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+  function secs(x) { return x < 10 ? x.toFixed(1) + "s" : Math.round(x) + "s"; }
+  function host(url) { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
+
+  // Minimal Markdown for excerpts: headings, bold, links, paragraphs
+  function mdLite(text) {
+    return String(text || "").split(/\n{2,}/).map(function (block) {
+      var b = block.trim();
+      if (!b || b.indexOf("```") === 0) return "";
+      var inline = function (s) {
+        return esc(s)
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_, t, u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + t + "</a>"; })
+          .replace(/`([^`]+)`/g, "<code>$1</code>");
+      };
+      if (/^# /.test(b)) return "<h3>" + inline(b.slice(2)) + "</h3>";
+      if (/^##+ /.test(b)) return "<h4>" + inline(b.replace(/^#+ /, "")) + "</h4>";
+      return "<p>" + inline(b).replace(/\n/g, " ") + "</p>";
+    }).join("");
+  }
+
+  // ---------- build ----------
+  function buildPicker() {
+    var root = $("runs");
+    root.innerHTML = RUNS.map(function (r, i) {
+      return '<button class="run-card" type="button" role="radio" aria-checked="' + (i === state.run) + '" data-i="' + i + '">' +
+        '<span><span class="chip kind">' + esc(r.kind) + '</span></span>' +
+        '<span class="topic">' + esc(r.topic) + '</span>' +
+        '<span class="meta">' + r.sources + ' sources · ' + (r.workers.length ? r.workers.length + ' sections · ' : '') + fmt(r.duration) + '</span>' +
+        '</button>';
+    }).join("");
+    root.addEventListener("click", function (e) {
+      var card = e.target.closest(".run-card");
+      if (card) selectRun(+card.dataset.i);
+    });
+    var topics = {};
+    RUNS.forEach(function (r) { topics[r.topic] = (topics[r.topic] || 0) + 1; });
+    var shared = Object.keys(topics).filter(function (t) { return topics[t] > 1; });
+    $("pair-note").textContent = shared.length
+      ? "The first two runs are the same topic, written once as an analysis piece and once as a technical post. Compare how the two branches plan and edit."
+      : "";
+  }
+
+  function selectRun(i) {
+    state.run = i; state.t = 0; state.playing = false; state.pinned = null; state.lastKey = null; state.lastNodeState = null;
+    document.querySelectorAll(".run-card").forEach(function (c) { c.setAttribute("aria-checked", String(+c.dataset.i === i)); });
+    var r = RUNS[i];
+    timeline = [];
+    r.nodes.forEach(function (n) {
+      if (n.key === "reducer" && r.workers.length) {
+        var end = Math.max.apply(null, r.workers.map(function (w) { return w.end; }));
+        timeline.push({ key: "workers", model: "Sonnet", start: r.workers[0].start, end: end, detail: { sections: r.workers } });
+      }
+      timeline.push(n);
+    });
+    byKey = {};
+    timeline.forEach(function (n) { byKey[n.key] = n; });
+
+    $("worker-chips").innerHTML = r.workers.map(function (w) { return '<span class="w" data-id="' + w.id + '">§' + w.id + "</span>"; }).join("");
+    $("lane-technical").dataset.state = r.kind === "technical" ? "" : "skipped";
+    $("lane-analysis").dataset.state = r.kind === "analysis" ? "" : "skipped";
+
+    // timeline segments, coloured by model
+    var track = $("track");
+    track.querySelectorAll(".seg").forEach(function (s) { s.remove(); });
+    timeline.forEach(function (n) {
+      if (n.end - n.start <= 0) return;
+      var seg = document.createElement("div");
+      seg.className = "seg " + n.model;
+      seg.style.left = (n.start / r.duration * 100) + "%";
+      seg.style.width = ((n.end - n.start) / r.duration * 100) + "%";
+      seg.title = n.key + " · " + secs(n.end - n.start);
+      track.insertBefore(seg, $("rest"));
+    });
+    $("seek").max = r.duration;
+    render(true);
+  }
+
+  // ---------- state ----------
+  // A step is done once the clock reaches its end, and running only while the clock is inside it,
+  // so nothing shows as running at 0:00 before Play is pressed
+  function nodeState(n, t) {
+    if (!n) return "skipped";
+    if (t >= n.end) return "done";
+    if (t > n.start) return "running";
+    return "waiting";
+  }
+  function liveKey(t) {
+    if (t <= 0) return "request";
+    var running = timeline.filter(function (n) { return n.start < t && t < n.end; });
+    if (running.length) return running[running.length - 1].key;
+    var done = timeline.filter(function (n) { return n.end <= t; });
+    return done.length ? done[done.length - 1].key : "request";
+  }
+
+  // ---------- render ----------
+  function render(force) {
+    var r = RUNS[state.run];
+    var t = state.t;
+
+    document.querySelectorAll(".node").forEach(function (el) {
+      var n = byKey[el.dataset.key];
+      var st = nodeState(n, t);
+      el.dataset.state = st;
+      el.disabled = st === "skipped";
+      el.querySelector(".time").textContent =
+        st === "done" ? secs(n.end - n.start) : st === "running" ? secs(t - n.start) : "";
+      el.setAttribute("aria-label", el.dataset.key + ", " + st);
+    });
+    document.querySelectorAll(".w").forEach(function (el) {
+      var w = r.workers.filter(function (x) { return String(x.id) === el.dataset.id; })[0];
+      el.dataset.state = !w ? "waiting" : t >= w.end ? "done" : t > w.start ? "running" : "waiting";
+    });
+
+    $("clock").innerHTML = "<b>" + fmt(t) + "</b> / " + fmt(r.duration);
+    var pct = r.duration ? t / r.duration * 100 : 0;
+    $("playhead").style.left = "calc(" + pct + "% - 1px)";
+    $("rest").style.left = pct + "%";
+    $("seek").value = t;
+    $("play").textContent = state.playing ? "Pause" : (t >= r.duration ? "Replay" : (t > 0 ? "Resume" : "Play"));
+
+    var key = state.pinned || liveKey(t);
+    var n = byKey[key];
+    var st = key === "request" ? "done" : nodeState(n, t);
+    document.querySelectorAll(".node").forEach(function (el) { el.setAttribute("aria-current", String(el.dataset.key === key)); });
+
+    if (force || key !== state.lastKey || st !== state.lastNodeState) {
+      state.lastKey = key; state.lastNodeState = st;
+      renderInspector(key, n, st);
+      renderLog();
+    }
+    renderStatus(key, n, st);
+  }
+
+  function renderStatus(key, n, st) {
+    var html = "";
+    if (n && n.model) html += '<span class="chip ' + n.model + '">' + n.model + "</span>";
+    if (n) {
+      if (st === "running") html += "<span>running · " + secs(state.t - n.start) + "</span>";
+      else if (st === "done") html += "<span>" + (n.end > n.start ? "done in " + secs(n.end - n.start) : "done") + "</span>";
+      else html += "<span>waiting</span>";
+    }
+    if (state.pinned) html += '<button class="follow" type="button" id="follow">Follow live</button>';
+    var box = $("insp-status");
+    if (box.innerHTML !== html) box.innerHTML = html;
+  }
+
+  function renderInspector(key, n, st) {
+    var r = RUNS[state.run];
+    $("insp-title").textContent = key === "workers" ? "workers × " + r.workers.length : key;
+    var body = '<p class="does">' + esc(DOES[key] || "") + "</p>";
+
+    if (key === "request") {
+      body += '<div class="request"><span class="topic">“' + esc(r.topic) + '”</span>' +
+        '<dl class="kv"><dt>Kind</dt><dd>' + (byKey.classify && byKey.classify.detail.given ? esc(r.kind) + " (chosen by the user)" : "auto: the classifier decides") + "</dd>" +
+        "<dt>Run</dt><dd class=\"mono\" style=\"font-size:.82rem;overflow-wrap:anywhere\">" + esc(r.id) + "</dd></dl>" +
+        '<p class="muted">Press <b>Play</b> to watch this run, or click any step in the pipeline once it has finished.</p></div>';
+    } else if (st === "waiting") {
+      body += '<p class="empty">This step hasn\'t started yet.</p>';
+    } else if (st === "running") {
+      body += '<div class="working" aria-hidden="true"><div class="bar" style="width:92%"></div><div class="bar" style="width:76%"></div><div class="bar" style="width:84%"></div></div>';
+      if (key === "workers") body += '<p class="empty">Writing ' + r.workers.length + " sections in parallel.</p>";
+    } else {
+      body += detailHtml(key, n.detail, r);
+    }
+    $("insp-body").innerHTML = body;
+  }
+
+  function detailHtml(key, d, r) {
+    switch (key) {
+      case "classify":
+        return d.given
+          ? '<p>The kind was set to <b>' + esc(d.kind) + "</b> when the run started, so the classifier was skipped.</p>"
+          : "<p>The classifier read the request and chose <b>" + esc(d.kind) + "</b>.</p>";
+      case "router":
+        return '<dl class="kv"><dt>Mode</dt><dd><code>' + esc(d.mode) + "</code> " + esc(MODES[d.mode] || "") + "</dd>" +
+          "<dt>Recency</dt><dd>" + d.recency_days + " days</dd></dl>" +
+          (d.queries && d.queries.length ? "<h3>Search queries</h3><ol class=\"list\">" + d.queries.map(function (q) { return "<li>" + esc(q) + "</li>"; }).join("") + "</ol>" : "<p>No research needed.</p>");
+      case "research":
+        return "<h3>" + d.evidence.length + " sources kept</h3>" +
+          (d.warnings && d.warnings.length ? '<ul class="list">' + d.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul>" : "") +
+          '<div class="scroll-box">' + d.evidence.map(function (e, i) {
+            return '<div class="ev"><span class="src">[' + (i + 1) + "] " + esc(host(e.url)) + (e.date ? " · " + esc(e.date) : " · date unknown") + "</span>" +
+              '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.title) + "</a><p>" + esc(e.snippet) + "</p></div>";
+          }).join("") + "</div>";
+      case "orchestrator":
+        return '<dl class="kv"><dt>Title</dt><dd>' + esc(d.title) + "</dd><dt>Kind</dt><dd><code>" + esc(d.blog_kind) + "</code></dd><dt>Summary</dt><dd>" + esc(d.description) + "</dd></dl>" +
+          '<div style="overflow-x:auto"><table class="tasks"><thead><tr><th>#</th><th>Section</th><th>Words</th><th>Uses</th></tr></thead><tbody>' +
+          d.tasks.map(function (tk) {
+            return "<tr><td class=\"num\">" + tk.id + "</td><td>" + esc(tk.title) + (tk.code ? ' <span class="chip code">code</span>' : "") + "</td><td class=\"num\">" + tk.words + "</td><td>" +
+              (tk.evidence.length ? tk.evidence.map(function (x) { return '<span class="ref">[' + x + "]</span>"; }).join(" ") : '<span class="muted">—</span>') + "</td></tr>";
+          }).join("") + "</tbody></table></div>";
+      case "workers":
+        return '<div class="scroll-box" style="display:flex;flex-direction:column;gap:8px">' + d.sections.map(function (s) {
+          return '<div class="sec"><div class="sec-head"><h3>§' + s.id + " " + esc(s.title) + "</h3><span>" + s.words + " words" + (s.code ? " · code" : "") + "</span></div>" +
+            (s.issues.length ? '<p style="color:var(--strike)">Still failing after retry: ' + esc(s.issues.join("; ")) + "</p>" : "") +
+            "<p>" + esc(s.excerpt) + "</p></div>";
+        }).join("") + "</div>";
+      case "reducer":
+        return "<p>Joined <b>" + d.sections + "</b> sections into one draft of <b>" + d.words.toLocaleString() + "</b> words.</p>";
+      case "planner":
+        return '<dl class="kv"><dt>Headline</dt><dd>' + esc(d.title) + "</dd><dt>Kind</dt><dd><code>" + esc(d.piece_kind) + "</code>, " + d.target_words + " words</dd></dl>" +
+          "<h3>Thesis</h3><p class=\"thesis\">" + esc(d.thesis) + "</p>" +
+          "<h3>Argument beats</h3><ol class=\"list\">" + d.beats.map(function (b) {
+            return "<li>" + esc(b.point) + " " + (b.evidence.length ? b.evidence.map(function (x) { return '<span class="ref">[' + x + "]</span>"; }).join(" ") : '<span class="muted" style="font-size:.8rem">reasoning only</span>') + "</li>";
+          }).join("") + "</ol>" +
+          "<h3>Counterpoint to address</h3><p>" + esc(d.counterpoint) + "</p>";
+      case "writer":
+        return "<p><b>" + d.words + "</b> words drafted. The opening:</p><div class=\"paper\">" + mdLite(d.excerpt) + "</div>";
+      case "editor":
+      case "grounding":
+        return "<h3>" + d.issues.length + (key === "editor" ? " notes from the editor" : " grounding fixes") + "</h3>" +
+          (d.issues.length ? '<div class="notes scroll-box" style="max-height:260px">' + d.issues.map(function (i) { return '<div class="note"><span>' + esc(i) + "</span></div>"; }).join("") + "</div>" : '<p class="muted">Every cited claim checked out.</p>') +
+          (d.changes.length ? "<h3>Sample changes</h3>" + d.changes.map(function (c) {
+            return '<div class="change">' + (c.before ? '<span class="before"><span class="lbl">before</span>' + esc(c.before) + "</span>" : "") +
+              (c.after ? '<span class="after"><span class="lbl">after</span>' + esc(c.after) + "</span>" : '<span class="after"><span class="lbl">after</span><i class="muted">removed</i></span>') + "</div>";
+          }).join("") : "");
+      case "tagger":
+        return '<div class="tags">' + d.tags.map(function (tg) { return '<span class="tag">' + esc(tg) + "</span>"; }).join("") + "</div>";
+      case "save":
+        return '<p>Saved <code>blog_posts/' + esc(d.file) + "</code>: " + r.final_words.toLocaleString() + " words.</p>" +
+          '<div class="fm">---\ntitle: "' + esc(r.title) + '"\nkind: ' + esc(r.kind) + "\n" + (r.kind === "technical" ? "blog_kind" : "piece_kind") + ": " + esc(r.piece) + "\ntags: [" + esc(r.tags.join(", ")) + "]\n---</div>" +
+          '<div class="paper">' + mdLite(d.excerpt) + "</div>";
+    }
+    return "";
+  }
+
+  function summary(n) {
+    var d = n.detail, r = RUNS[state.run];
+    switch (n.key) {
+      case "classify": return d.given ? "kind given: " + d.kind : "chose " + d.kind;
+      case "router": return d.mode + ", " + (d.queries || []).length + " queries";
+      case "research": return d.evidence.length + " sources kept";
+      case "orchestrator": return d.tasks.length + " sections: " + d.title;
+      case "workers": return r.workers.length + " sections written";
+      case "reducer": return d.words.toLocaleString() + " words joined";
+      case "planner": return "thesis: " + d.thesis;
+      case "writer": return d.words + " words drafted";
+      case "editor": return d.issues.length + " editor notes";
+      case "grounding": return d.issues.length + " grounding fixes";
+      case "tagger": return d.tags.join(", ");
+      case "save": return d.file;
+    }
+    return "";
+  }
+
+  function renderLog() {
+    var done = timeline.filter(function (n) { return nodeState(n, state.t) === "done"; });
+    $("log").innerHTML = done.length
+      ? done.map(function (n) {
+          return '<li><button type="button" data-key="' + n.key + '"><span class="t">' + fmt(n.end) + '</span><span class="k">' + esc(n.key) + '</span><span class="what">' + esc(summary(n)) + "</span></button></li>";
+        }).join("")
+      : '<li class="empty" style="padding:8px 0">Finished steps appear here.</li>';
+  }
+
+  // ---------- playback ----------
+  var last = null;
+  function frame(now) {
+    if (state.playing) {
+      if (last != null) {
+        var r = RUNS[state.run];
+        state.t = Math.min(r.duration, state.t + (now - last) / 1000 * state.speed);
+        if (state.t >= r.duration) state.playing = false;
+      }
+      last = now;
+      render(false);
+    } else {
+      last = null;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function togglePlay() {
+    var r = RUNS[state.run];
+    if (!state.playing && state.t >= r.duration) { state.t = 0; state.pinned = null; }
+    state.playing = !state.playing;
+    render(true);
+  }
+  function nextStep() {
+    var t = state.t;
+    var ends = timeline.map(function (n) { return n.end; }).filter(function (e) { return e > t + 0.01; });
+    var starts = timeline.map(function (n) { return n.start; }).filter(function (s) { return s > t + 0.01; });
+    var target = Math.min.apply(null, ends.concat(starts).concat([RUNS[state.run].duration]));
+    state.playing = false; state.pinned = null; state.t = target;
+    render(true);
+  }
+
+  if (!RUNS.length) {
+    $("insp-body").innerHTML = '<p class="empty">The replay data (demo-data.js) didn\'t load. Open this page from the project site, or from a local web server rather than as a file.</p>';
+    document.querySelectorAll(".transport button, .transport input, .node").forEach(function (el) { el.disabled = true; });
+    return;
+  }
+
+  $("play").addEventListener("click", togglePlay);
+  $("step").addEventListener("click", nextStep);
+  $("restart").addEventListener("click", function () { state.t = 0; state.playing = false; state.pinned = null; render(true); });
+  $("seek").addEventListener("input", function (e) { state.t = +e.target.value; state.pinned = null; render(true); });
+  $("speed").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.speed = +b.dataset.speed;
+    document.querySelectorAll("#speed button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+  });
+  document.querySelectorAll("#speed button").forEach(function (x) { x.setAttribute("aria-pressed", String(+x.dataset.speed === state.speed)); });
+  $("pipe").addEventListener("click", function (e) {
+    var b = e.target.closest(".node"); if (!b || b.disabled) return;
+    state.pinned = b.dataset.key; render(true);
+  });
+  $("log").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-key]"); if (!b) return;
+    state.pinned = b.dataset.key; render(true);
+  });
+  $("insp-status").addEventListener("click", function (e) {
+    if (e.target.id === "follow") { state.pinned = null; render(true); }
+  });
+
+  buildPicker();
+  selectRun(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

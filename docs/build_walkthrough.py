@@ -244,6 +244,7 @@ footer a { color: var(--muted); }
     <ul>
       <li><a href="../index.html">Home</a></li>
       <li><a href="how-it-works.html">How it works</a></li>
+      <li><a href="demo.html">Replay</a></li>
       <li><a href="walkthrough.html" aria-current="page">Walkthrough</a></li>
       <li><a href="../readme.html">README</a></li>
       <li><a href="{{REPO}}">GitHub</a></li>
