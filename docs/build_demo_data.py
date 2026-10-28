@@ -84,7 +84,7 @@ def load_run(run_id: str) -> dict:
             workers.append({
                 "id": sid, "title": heading, "words": words(md), "code": "```" in md,
                 "issues": [p for _, p in up.get("section_issues", [])],
-                "excerpt": clip(re.sub(r"^## .*\n+", "", md), 360), "end": end,
+                "text": re.sub(r"^## .*\n+", "", md).strip(), "end": end,   # full text, streamed by the page
             })
             continue
         steps.append({"node": node, "update": up, "end": end})
@@ -117,7 +117,7 @@ def load_run(run_id: str) -> dict:
                       "target_words": p["target_words"], "counterpoint": p["counterpoint"],
                       "beats": [{"point": b["point"], "evidence": b["evidence_ids"]} for b in p["beats"]]}
         elif node == "writer":
-            detail = {"words": words(up["draft"]), "excerpt": clip(up["draft"], 700)}
+            detail = {"words": words(up["draft"]), "text": up["draft"].strip()}   # full draft, streamed by the page
         elif node == "reducer":
             detail = {"words": words(up["draft"]), "sections": len(workers)}
         elif node in ("editor", "grounding"):

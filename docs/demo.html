@@ -213,6 +213,36 @@ ol.list, ul.list { margin: 0; padding-left: 22px; display: flex; flex-direction:
 .request { display: flex; flex-direction: column; gap: 12px; }
 .request .topic { font-family: var(--display); font-size: 1.3rem; line-height: 1.35; }
 
+/* streaming */
+.live-tag { display: inline-flex; align-items: center; gap: 6px; font: 500 0.7rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.stream { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
+.thinking { color: var(--muted); font-style: italic; }
+.counter { font: 0.78rem/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.typing { font-family: var(--display); font-size: 1.05rem; line-height: 1.45; }
+.caret { display: inline-block; width: 0.5em; height: 1.05em; margin-left: 1px; vertical-align: text-bottom; background: var(--accent); }
+.searches { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.88rem; }
+.searches li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; color: var(--muted); }
+.searches li::before { content: "·"; text-align: center; }
+.searches li[data-s="done"] { color: var(--ink); }
+.searches li[data-s="done"]::before { content: "✓"; color: var(--haiku); }
+.searches li[data-s="now"] { color: var(--accent); }
+.searches li[data-s="now"]::before { content: "↻"; }
+.sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sec.live { gap: 4px; padding: 8px 10px; }
+.sec.live h3 { font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-text { max-height: 150px; overflow: auto; font-size: 0.8rem; line-height: 1.5; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.sec-text > *, .paper > * { margin: 0; }
+.sec-text h4 { font-size: 0.82rem; }
+.sec-text ul, .sec-text ol, .paper ul, .paper ol { padding-left: 18px; }
+pre.snippet { margin: 0; background: var(--code-bg); border-radius: 3px; padding: 8px 10px; overflow-x: auto; font: 0.74rem/1.5 var(--mono); color: var(--ink); white-space: pre; }
+.paper pre.snippet { font-size: 0.8rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .caret, .live-dot { animation: blink 1s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+}
+@media (max-width: 640px) { .sections { grid-template-columns: 1fr; } }
+
 /* log */
 .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .log li { border-bottom: 1px solid var(--line); }
@@ -259,7 +289,7 @@ footer a { color: var(--muted); }
   <header class="intro">
     <span class="eyebrow">Replay of recorded runs</span>
     <h1>Watch the agent write a post</h1>
-    <p class="lede">Pick a run and press Play. Every query, source, plan, section and edit you see comes from a real run's saved snapshots, and the timings are real, sped up. Nothing is generated in your browser.</p>
+    <p class="lede">Pick a run and press Play. While each step runs, its output streams into the panel on the right: queries, sources, the plan, the draft as it's written, the editor's notes. Everything comes from a real run's saved snapshots, with real timings, sped up. Nothing is generated in your browser.</p>
   </header>
 
   <section aria-labelledby="pick-h" style="display:flex;flex-direction:column;gap:10px">
@@ -337,7 +367,7 @@ footer a { color: var(--muted); }
     <ol class="log" id="log"></ol>
   </section>
 
-  <p class="fine">Replays use data extracted from the runs' QA snapshots by <code>docs/build_demo_data.py</code>. Step times come from when each snapshot was written. Parallel section writers are recorded as finishing together, so they're shown that way. To write your own post, see the <a href="../readme.html#install">installation steps</a>.</p>
+  <p class="fine">Replays use data extracted from the runs' QA snapshots by <code>docs/build_demo_data.py</code>. Step times come from when each snapshot was written. The snapshots keep each step's final output but not the timing of individual tokens, so streamed text is revealed at an even pace across the step's real duration. Parallel section writers are recorded as finishing together, so they're shown that way. To write your own post, see the <a href="../readme.html#install">installation steps</a>.</p>
 
   <footer>
     <span><a href="../index.html">blog-writing-agent</a> · <a href="https://github.com/20161302animesh/blog-writing-agent">source on GitHub</a></span>
@@ -389,23 +419,49 @@ footer a { color: var(--muted); }
     return m + ":" + (s < 10 ? "0" : "") + s;
   }
   function secs(x) { return x < 10 ? x.toFixed(1) + "s" : Math.round(x) + "s"; }
+  function clipText(s, n) {
+    s = String(s || "").replace(/```[\s\S]*?(```|$)/g, " ").replace(/[#*`]/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\s+/g, " ").trim();
+    return s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, "") + "…";
+  }
   function host(url) { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
 
-  // Minimal Markdown for excerpts: headings, bold, links, paragraphs
-  function mdLite(text) {
-    return String(text || "").split(/\n{2,}/).map(function (block) {
-      var b = block.trim();
-      if (!b || b.indexOf("```") === 0) return "";
-      var inline = function (s) {
-        return esc(s)
-          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-          .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_, t, u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + t + "</a>"; })
-          .replace(/`([^`]+)`/g, "<code>$1</code>");
-      };
-      if (/^# /.test(b)) return "<h3>" + inline(b.slice(2)) + "</h3>";
-      if (/^##+ /.test(b)) return "<h4>" + inline(b.replace(/^#+ /, "")) + "</h4>";
-      return "<p>" + inline(b).replace(/\n/g, " ") + "</p>";
-    }).join("");
+  // Small Markdown renderer for drafts and sections: headings, paragraphs, lists, bold, links,
+  // inline code and fenced code. Copes with half-written text, so it can render a stream as it grows.
+  // With caret=true, a blinking caret is drawn where the text currently ends.
+  var CARET = "⁣";
+  function inline(s) {
+    return esc(s)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_, t, u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + t + "</a>"; })
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  function mdLite(text, caret) {
+    var lines = (String(text || "") + (caret ? CARET : "")).split("\n");
+    var out = [], para = [], list = null, code = null;
+    function flushPara() { if (para.length) { out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } }
+    function flushList() { if (list) { out.push("<" + list.tag + ">" + list.items.map(function (i) { return "<li>" + inline(i) + "</li>"; }).join("") + "</" + list.tag + ">"); list = null; } }
+    lines.forEach(function (line) {
+      if (code) {
+        if (/^\s*```/.test(line)) { out.push('<pre class="snippet"><code>' + esc(code.join("\n")) + "</code></pre>"); code = null; }
+        else code.push(line);
+        return;
+      }
+      if (/^\s*```/.test(line)) { flushPara(); flushList(); code = []; return; }
+      if (!line.trim()) { flushPara(); flushList(); return; }
+      var m;
+      if ((m = /^(#{1,6})\s+(.*)$/.exec(line))) { flushPara(); flushList(); out.push(m[1].length === 1 ? "<h3>" + inline(m[2]) + "</h3>" : "<h4>" + inline(m[2]) + "</h4>"); return; }
+      if ((m = /^\s*([-*]|\d+\.)\s+(.*)$/.exec(line))) {
+        flushPara();
+        var tag = /\d/.test(m[1]) ? "ol" : "ul";
+        if (!list || list.tag !== tag) { flushList(); list = { tag: tag, items: [] }; }
+        list.items.push(m[2]); return;
+      }
+      if (list) { list.items[list.items.length - 1] += " " + line.trim(); return; }
+      para.push(line.trim());
+    });
+    if (code) out.push('<pre class="snippet"><code>' + esc(code.join("\n")) + "</code></pre>");   // still being written
+    flushPara(); flushList();
+    return out.join("").split(CARET).join('<span class="caret" aria-hidden="true"></span>');
   }
 
   // ---------- build ----------
@@ -518,7 +574,124 @@ footer a { color: var(--muted); }
       renderInspector(key, n, st);
       renderLog();
     }
+    if (st === "running") renderStream(key, n);
     renderStatus(key, n, st);
+  }
+
+  // ---------- streaming ----------
+  // The recordings keep each step's final output, not token timing, so output is revealed
+  // evenly across the step's real duration (after a short pause, like time to first token).
+  function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+  function phase(p, a, b) { return clamp01((p - a) / (b - a)); }
+  function typed(text, f) { text = text || ""; return text.slice(0, Math.floor(text.length * f)); }
+  function count(n, f) { return Math.min(n, Math.ceil(n * f)); }
+
+  function renderStream(key, n) {
+    var box = $("stream");
+    if (!box) return;
+    var r = RUNS[state.run], d = n.detail;
+    var p = clamp01((state.t - n.start) / Math.max(0.001, n.end - n.start));
+    var f = phase(p, 0.04, 1);   // reveal fraction after the first-token pause
+    var html = "", sig;
+
+    switch (key) {
+      case "classify":
+        sig = "c";
+        html = '<p class="thinking">Reading the request…</p>';
+        break;
+      case "router": {
+        var qs = d.queries || [], k = count(qs.length, phase(p, 0.2, 1));
+        sig = k + (p > 0.2 ? "m" : "");
+        html = p < 0.2 ? '<p class="thinking">Deciding how much research this needs…</p>'
+          : '<dl class="kv"><dt>Mode</dt><dd><code>' + esc(d.mode) + "</code> " + esc(MODES[d.mode] || "") + "</dd></dl>" +
+            (qs.length ? '<h3>Search queries</h3><ol class="list">' + qs.slice(0, k).map(function (q) { return "<li>" + esc(q) + "</li>"; }).join("") + "</ol>" : "");
+        break;
+      }
+      case "research": {
+        var queries = (byKey.router && byKey.router.detail.queries) || [];
+        var searched = Math.floor(queries.length * phase(p, 0, 0.45));
+        var ev = d.evidence, shown = p < 0.45 ? 0 : count(ev.length, phase(p, 0.45, 1));
+        sig = searched + "/" + shown;
+        html = "<h3>Searching the web</h3><ul class=\"searches\">" + queries.map(function (q, i) {
+          var s = i < searched ? "done" : i === searched && p < 0.45 ? "now" : "todo";
+          return '<li data-s="' + s + '">' + esc(q) + "</li>";
+        }).join("") + "</ul>";
+        if (p >= 0.45) {
+          html += "<h3>Evidence: " + shown + " of " + ev.length + " sources kept</h3>" + ev.slice(0, shown).map(function (e, i) {
+            return '<div class="ev"><span class="src">[' + (i + 1) + "] " + esc(host(e.url)) + (e.date ? " · " + esc(e.date) : "") + "</span>" +
+              '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.title) + "</a></div>";
+          }).join("");
+        } else {
+          html += '<p class="thinking">Collecting results…</p>';
+        }
+        break;
+      }
+      case "orchestrator": {
+        var head = d.title + " — " + d.description, hf = phase(p, 0.04, 0.3), rows = count(d.tasks.length, phase(p, 0.3, 1));
+        sig = Math.floor(head.length * hf) + "/" + (p > 0.3 ? rows : 0);
+        html = '<p class="typing">' + esc(typed(head, hf)) + (p < 0.3 ? '<span class="caret"></span>' : "") + "</p>";
+        if (p > 0.3) html += '<ol class="list">' + d.tasks.slice(0, rows).map(function (tk) {
+          return "<li>" + esc(tk.title) + ' <span class="muted" style="font-size:.8rem">' + tk.words + " words" + (tk.code ? " · code" : "") + "</span></li>";
+        }).join("") + "</ol>";
+        break;
+      }
+      case "planner": {
+        var tf = phase(p, 0.04, 0.3), bc = count(d.beats.length, phase(p, 0.3, 0.85)), cf = phase(p, 0.85, 1);
+        sig = Math.floor(d.thesis.length * tf) + "/" + (p > 0.3 ? bc : 0) + "/" + Math.floor(d.counterpoint.length * cf);
+        html = '<h3>Thesis</h3><p class="thesis">' + esc(typed(d.thesis, tf)) + (p < 0.3 ? '<span class="caret"></span>' : "") + "</p>";
+        if (p > 0.3) html += '<h3>Argument beats</h3><ol class="list">' + d.beats.slice(0, bc).map(function (b) { return "<li>" + esc(b.point) + "</li>"; }).join("") + "</ol>";
+        if (p > 0.85) html += "<h3>Counterpoint</h3><p>" + esc(typed(d.counterpoint, cf)) + '<span class="caret"></span></p>';
+        break;
+      }
+      case "writer": {
+        var txt = typed(d.text, f);
+        sig = txt.length;
+        html = '<p class="counter">' + (txt.trim() ? txt.trim().split(/\s+/).length : 0) + " words so far</p>" +
+          '<div class="paper stream-text">' + (txt ? mdLite(txt, true) : '<p class="thinking">Starting the draft…</p>') + "</div>";
+        break;
+      }
+      case "workers": {
+        sig = Math.floor(f * 400);
+        html = '<p class="counter">' + r.workers.length + " sections writing in parallel</p><div class=\"sections\">" + r.workers.map(function (w) {
+          var wp = phase(clamp01((state.t - w.start) / Math.max(0.001, w.end - w.start)), 0.04, 1);
+          var part = typed(w.text, wp);
+          return '<div class="sec live"><div class="sec-head"><h3>§' + w.id + " " + esc(w.title) + "</h3><span>" + Math.round(wp * 100) + "%</span></div>" +
+            '<div class="sec-text">' + (part ? mdLite(part, true) : '<p class="thinking">waiting for first tokens…</p>') + "</div></div>";
+        }).join("") + "</div>";
+        break;
+      }
+      case "editor":
+      case "grounding": {
+        var ni = count(d.issues.length, phase(p, 0.12, 0.8)), nc = count(d.changes.length, phase(p, 0.8, 1));
+        sig = (p < 0.12 ? "r" : ni) + "/" + (p > 0.8 ? nc : 0);
+        html = p < 0.12 ? '<p class="thinking">Reading the draft next to the source text…</p>'
+          : '<div class="notes">' + d.issues.slice(0, ni).map(function (i) { return '<div class="note"><span>' + esc(i) + "</span></div>"; }).join("") + "</div>";
+        if (p > 0.8) html += d.changes.slice(0, nc).map(function (c) {
+          return '<div class="change">' + (c.before ? '<span class="before"><span class="lbl">before</span>' + esc(c.before) + "</span>" : "") +
+            '<span class="after"><span class="lbl">after</span>' + (c.after ? esc(c.after) : '<i class="muted">removed</i>') + "</span></div>";
+        }).join("");
+        break;
+      }
+      case "tagger": {
+        var nt = count(d.tags.length, f);
+        sig = nt;
+        html = '<div class="tags">' + d.tags.slice(0, nt).map(function (tg) { return '<span class="tag">' + esc(tg) + "</span>"; }).join("") + "</div>";
+        break;
+      }
+      default:
+        sig = "x";
+        html = '<p class="thinking">Working…</p>';
+    }
+
+    if (sig === state.streamSig) return;
+    state.streamSig = sig;
+    // Keep long streams pinned to the newest text unless the reader has scrolled up
+    var stick = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    var inner = box.querySelectorAll(".sec-text");
+    var innerStick = Array.prototype.map.call(inner, function (el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 30; });
+    box.innerHTML = html;
+    if (stick) box.scrollTop = box.scrollHeight;
+    box.querySelectorAll(".sec-text").forEach(function (el, i) { if (innerStick[i] !== false) el.scrollTop = el.scrollHeight; });
   }
 
   function renderStatus(key, n, st) {
@@ -547,8 +720,8 @@ footer a { color: var(--muted); }
     } else if (st === "waiting") {
       body += '<p class="empty">This step hasn\'t started yet.</p>';
     } else if (st === "running") {
-      body += '<div class="working" aria-hidden="true"><div class="bar" style="width:92%"></div><div class="bar" style="width:76%"></div><div class="bar" style="width:84%"></div></div>';
-      if (key === "workers") body += '<p class="empty">Writing ' + r.workers.length + " sections in parallel.</p>";
+      body += '<div class="live-tag"><span class="live-dot"></span>streaming</div><div id="stream" class="stream" aria-live="off"></div>';
+      state.streamSig = null;
     } else {
       body += detailHtml(key, n.detail, r);
     }
@@ -583,7 +756,7 @@ footer a { color: var(--muted); }
         return '<div class="scroll-box" style="display:flex;flex-direction:column;gap:8px">' + d.sections.map(function (s) {
           return '<div class="sec"><div class="sec-head"><h3>§' + s.id + " " + esc(s.title) + "</h3><span>" + s.words + " words" + (s.code ? " · code" : "") + "</span></div>" +
             (s.issues.length ? '<p style="color:var(--strike)">Still failing after retry: ' + esc(s.issues.join("; ")) + "</p>" : "") +
-            "<p>" + esc(s.excerpt) + "</p></div>";
+            "<p>" + esc(clipText(s.text, 360)) + "</p></div>";
         }).join("") + "</div>";
       case "reducer":
         return "<p>Joined <b>" + d.sections + "</b> sections into one draft of <b>" + d.words.toLocaleString() + "</b> words.</p>";
@@ -595,7 +768,7 @@ footer a { color: var(--muted); }
           }).join("") + "</ol>" +
           "<h3>Counterpoint to address</h3><p>" + esc(d.counterpoint) + "</p>";
       case "writer":
-        return "<p><b>" + d.words + "</b> words drafted. The opening:</p><div class=\"paper\">" + mdLite(d.excerpt) + "</div>";
+        return "<p><b>" + d.words + "</b> words drafted. This draft goes to the editor next.</p><div class=\"paper scroll-box\">" + mdLite(d.text) + "</div>";
       case "editor":
       case "grounding":
         return "<h3>" + d.issues.length + (key === "editor" ? " notes from the editor" : " grounding fixes") + "</h3>" +
