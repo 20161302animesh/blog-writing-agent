@@ -1,4 +1,10 @@
-<title>Blog Writing Agent</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How the Blog Writing Agent Works</title>
+<meta name="description" content="How the blog writing agent turns a topic into a researched, edited, tagged post: the pipeline, its two writing branches, and its quality checks.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -22,6 +28,7 @@
   --display: "Newsreader", Georgia, "Times New Roman", serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -43,14 +50,24 @@
 }
 
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
 body {
+  margin: 0;
   background: var(--bg);
   color: var(--ink);
   font: 400 16px/1.6 var(--body);
   padding-inline: 20px;
-  padding-block: 40px 64px;
+  padding-block: calc(28px + env(safe-area-inset-top, 0px)) calc(64px + env(safe-area-inset-bottom, 0px));
 }
+img { max-width: 100%; }
 .page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+
+/* site menu, shared with the other pages */
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; font-size: 0.92rem; margin-bottom: -16px; }
+.topbar .brand { font: 500 0.95rem/1 var(--mono); color: var(--ink); text-decoration: none; }
+.topbar ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; flex-wrap: wrap; }
+.topbar ul a { color: var(--muted); text-decoration: none; }
+.topbar ul a:hover, .topbar ul a[aria-current="page"] { color: var(--accent); }
 .prose { max-width: 680px; }
 
 h1, h2 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
@@ -136,8 +153,20 @@ footer { color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--lin
   .row .arrow { transform: rotate(90deg); }
 }
 </style>
-
+</head>
+<body>
 <div class="page">
+
+  <nav class="topbar" aria-label="Main">
+    <a class="brand" href="../index.html">blog-writing-agent</a>
+    <ul>
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="how-it-works.html" aria-current="page">How it works</a></li>
+      <li><a href="walkthrough.html">Walkthrough</a></li>
+      <li><a href="../readme.html">README</a></li>
+      <li><a href="https://github.com/20161302animesh/blog-writing-agent">GitHub</a></li>
+    </ul>
+  </nav>
 
   <header class="intro">
     <span class="eyebrow">blog_agent · LangGraph + Claude + Tavily</span>
@@ -275,3 +304,5 @@ print(result.output_path, result.tags)</pre>
   </footer>
 
 </div>
+</body>
+</html>
