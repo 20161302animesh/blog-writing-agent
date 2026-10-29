@@ -66,3 +66,7 @@ python -m pytest
 ```
 
 The tests use fake models and fake search, so they run offline and cost nothing.
+
+## Credits
+
+The technical pipeline (router, research, orchestrator, parallel workers, reducer) started from the [blog-writing-agent](https://github.com/campusx-official/blog-writing-agent) exercise by CampusX (Nitish Singh). See the [project README](../README.md#credits).

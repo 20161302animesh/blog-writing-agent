@@ -52,3 +52,9 @@ python -m pytest
 ```
 
 The tests run both pipelines end to end with fake models and fake search, so they need no API keys and cost nothing.
+
+## Credits
+
+This project grew out of the [blog-writing-agent](https://github.com/campusx-official/blog-writing-agent) exercise by [CampusX](https://github.com/campusx-official) (Nitish Singh). Its notebooks built the original technical pipeline on OpenAI models: a router, Tavily research, an orchestrator, parallel section writers using LangGraph's `Send`, and a reducer.
+
+This project ports that pipeline to Claude and extends it with the analysis branch, the editor and grounding checks, and the callable `blog_agent` package. Thanks to CampusX and Nitish Singh for the idea and the starting point.

@@ -267,7 +267,7 @@ footer a { color: var(--muted); }
 {{BODY}}
       <footer>
         <span><a href="../index.html">blog-writing-agent</a> · <a href="{{REPO}}">source on GitHub</a></span>
-        <span>Generated from walkthrough.ipynb by docs/build_walkthrough.py</span>
+        <span>Based on <a href="https://github.com/campusx-official/blog-writing-agent">CampusX's blog-writing-agent</a> · generated from walkthrough.ipynb</span>
       </footer>
     </main>
   </div>

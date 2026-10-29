@@ -164,6 +164,7 @@ footer a { color: var(--muted); }
         <li><a href="#tests">Tests</a></li>
         <li><a href="#cost">Cost</a></li>
         <li><a href="#issues">Known issues</a></li>
+        <li><a href="#credits">Credits</a></li>
       </ol>
     </aside>
 
@@ -435,9 +436,15 @@ python -m pytest</pre>
         </ul>
       </section>
 
+      <section id="credits" aria-labelledby="credits-h">
+        <h2 id="credits-h">Credits</h2>
+        <p>This project grew out of the <a href="https://github.com/campusx-official/blog-writing-agent">blog-writing-agent</a> exercise by <a href="https://github.com/campusx-official">CampusX</a> (Nitish Singh). Its notebooks built the original technical pipeline on OpenAI models: a router, Tavily research, an orchestrator, parallel section writers using LangGraph's <code>Send</code>, and a reducer.</p>
+        <p>This project ports that pipeline to Claude and extends it with the analysis branch, the editor and grounding checks, and the callable <code>blog_agent</code> package. Thanks to CampusX and Nitish Singh for the idea and the starting point.</p>
+      </section>
+
       <footer>
         <span><a href="index.html">blog-writing-agent</a> · <a href="https://github.com/20161302animesh/blog-writing-agent">source on GitHub</a></span>
-        <span>Built with LangGraph, Claude and Tavily</span>
+        <span>Based on <a href="https://github.com/campusx-official/blog-writing-agent">CampusX's blog-writing-agent</a> · built with LangGraph, Claude and Tavily</span>
       </footer>
     </main>
   </div>
