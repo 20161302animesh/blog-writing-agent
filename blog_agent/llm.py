@@ -46,6 +46,9 @@ class Models:
                 max_tokens=spec.max_tokens,
                 max_retries=self.settings.max_retries,
                 timeout=self.settings.request_timeout,
+                # Shows up on each LLM run in LangSmith, so usage can be filtered by role
+                tags=[f"role:{role}"],
+                metadata={"role": role},
             )
             if spec.effort:
                 kwargs["effort"] = spec.effort

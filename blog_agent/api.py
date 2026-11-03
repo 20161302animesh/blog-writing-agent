@@ -14,6 +14,7 @@ from .graph import build_graph
 from .qa import RunRecorder
 from .schemas import BlogResult
 from .state import SearchFn
+from .tracing import finish_trace, run_trace
 from .utils import slugify
 
 log = logging.getLogger("blog_agent")
@@ -93,30 +94,45 @@ def write_blog(
     }
     recorder = RunRecorder(Path(settings.qa_dir) / run_id) if qa else None
 
+    # LangSmith: one trace per call, findable by blog_run_id (a resumed run gets a second trace)
+    trace_meta = {
+        "blog_run_id": run_id,
+        "kind": kind,
+        "resumed": bool(resume_run_id),
+        "models": {role: spec.model for role, spec in settings.models.items()},
+    }
+    trace_inputs = {"topic": topic, "kind": kind, "target_words": target_words, "as_of": as_of,
+                    "resume_run_id": resume_run_id}
+
     state: Optional[dict] = None
     pending: List[tuple] = []
-    try:
-        for mode, chunk in app.stream(graph_input, config=config, stream_mode=["updates", "values"]):
-            if mode == "updates":
-                for node, update in chunk.items():
-                    log.info("finished node %s", node)
-                    pending.append((node, update or {}))
-                continue
-            state = chunk
+    with run_trace(trace_inputs, trace_meta, tags=["blog_agent"]) as rt:
+        try:
+            for mode, chunk in app.stream(graph_input, config=config, stream_mode=["updates", "values"]):
+                if mode == "updates":
+                    for node, update in chunk.items():
+                        log.info("finished node %s", node)
+                        pending.append((node, update or {}))
+                    continue
+                state = chunk
+                if recorder:
+                    recorder.record_step(pending, chunk)
+                pending = []
+        except Exception:
             if recorder:
-                recorder.record_step(pending, chunk)
-            pending = []
-    except Exception:
-        if recorder:
-            (recorder.run_dir / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
-        raise
+                (recorder.run_dir / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+            raise
+
+        usage, cost = _usage_summary(usage_handler)
+        if rt is not None:
+            rt.add_outputs({"title": (state or {}).get("title"), "usage": usage, "estimated_cost_usd": cost})
+    trace_url = finish_trace(rt)
 
     if state is None or not state.get("final"):
         raise RuntimeError(f"Run {run_id} ended without a final post (already finished, or nothing to resume?)")
     if recorder:
         recorder.finish(state)
 
-    usage, cost = _usage_summary(usage_handler)
     return BlogResult(
         run_id=run_id,
         kind=state["kind"],
@@ -133,6 +149,8 @@ def write_blog(
         warnings=state.get("warnings", []),
         usage=usage,
         estimated_cost_usd=cost,
+        trace_id=str(rt.trace_id) if rt is not None else None,
+        trace_url=trace_url,
         plan=state["plan"].model_dump() if state.get("plan") is not None else {},
     )
 

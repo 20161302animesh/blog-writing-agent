@@ -10,6 +10,7 @@ dependencies = [
     "langchain-core>=1.6,<2",
     "langchain-anthropic>=1.7,<2",
     "langchain-tavily>=0.2.18,<0.3",
+    "langsmith>=0.12,<1",
     "pydantic>=2.13,<3",
     "python-dotenv>=1.2,<2",
 ]

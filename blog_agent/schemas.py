@@ -131,4 +131,6 @@ class BlogResult(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     usage: Dict[str, Dict[str, int]] = Field(default_factory=dict, description="Token usage per model.")
     estimated_cost_usd: Optional[float] = None
+    trace_id: Optional[str] = Field(None, description="LangSmith trace id, when tracing is on.")
+    trace_url: Optional[str] = None
     plan: dict = Field(default_factory=dict)

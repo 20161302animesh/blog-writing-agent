@@ -32,7 +32,10 @@ def _summary(result) -> str:
     lines.append(f"TOKENS (in, out): {tokens}")
     if result.estimated_cost_usd is not None:
         lines.append(f"EST_COST_USD: {result.estimated_cost_usd}")
-    lines += [f"SAVED_TO: {result.output_path}", f"QA_SNAPSHOTS: {result.qa_dir}", "=" * 100]
+    lines += [f"SAVED_TO: {result.output_path}", f"QA_SNAPSHOTS: {result.qa_dir}"]
+    if result.trace_id:
+        lines.append(f"LANGSMITH_TRACE: {result.trace_url or result.trace_id}")
+    lines.append("=" * 100)
     return "\n".join(lines)
 
 

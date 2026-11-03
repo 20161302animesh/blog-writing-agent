@@ -42,6 +42,23 @@ python -m blog_agent --help
 | `BLOG_AGENT_GROUNDING_CHECK` | `false` to skip the technical grounding check |
 | `BLOG_AGENT_REFUSAL_FALLBACKS` | `false` to turn off server-side refusal fallback on Sonnet/Opus |
 
+## Trace with LangSmith
+
+Tracing is off by default. To send each run to LangSmith, set:
+
+```
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_...
+LANGSMITH_PROJECT=blog-agent   # optional; LangSmith uses "default" otherwise
+```
+
+Each `write_blog()` call becomes one trace. It has a root run named `write_blog`, the graph nodes under it, and every model call and Tavily search inside its node.
+
+- **Token usage:** LangSmith records input and output tokens on every LLM run. Each model call is tagged `role:<role>` (with matching `role` metadata), so you can filter or group usage by planner, writer, editor and so on.
+- **Run totals:** the root run's outputs hold the per-model usage and the package's cost estimate. That estimate uses `PRICES` in `config.py`. If LangSmith shows no cost for a model, add the model's price in LangSmith's model pricing settings.
+- **Finding a run:** the root run's metadata includes `blog_run_id` (the QA folder name), `kind`, `resumed` and the model for each role. `BlogResult.trace_id` and `BlogResult.trace_url` point to the trace, and the CLI prints the link.
+- **Resumed runs:** a resumed run gets a second trace with the same `blog_run_id`.
+
 ## Layout
 
 | File | What it holds |
@@ -56,6 +73,7 @@ python -m blog_agent --help
 | `graph.py` | `build_graph()` |
 | `qa.py` | Per-node snapshots, versions, diffs |
 | `checkpoint.py` | `sqlite_checkpointer()` for resumable runs |
+| `tracing.py` | Optional LangSmith root run per call |
 | `api.py` | `write_blog()`, `as_tool()` |
 | `cli.py` | Command line |
 

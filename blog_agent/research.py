@@ -1,11 +1,11 @@
 """Tavily search and the research node (shared by both pipelines)."""
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from typing import List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables.config import ContextThreadPoolExecutor
 from langchain_tavily import TavilySearch
 
 from .llm import LLMError
@@ -58,7 +58,8 @@ def research_node(state: State, *, deps: Deps) -> dict:
             warnings.append(f"search failed for {q!r}: {e}")
             return []
 
-    with ThreadPoolExecutor(max_workers=max(1, deps.settings.search_concurrency)) as pool:
+    # Context-copying pool, so the searches stay inside this node's trace
+    with ContextThreadPoolExecutor(max_workers=max(1, deps.settings.search_concurrency)) as pool:
         raw_results = [r for batch in pool.map(run_query, queries) for r in batch]
 
     # Enforce source rules in code, before the LLM sees anything

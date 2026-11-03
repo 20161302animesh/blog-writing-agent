@@ -31,6 +31,8 @@ print(result.title, result.output_path, result.estimated_cost_usd)
 
 `kind="auto"` lets a classifier choose. A typical run costs $0.20–0.40.
 
+To trace runs and token usage in LangSmith, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` (see [blog_agent/README.md](blog_agent/README.md#trace-with-langsmith)).
+
 ## Learn more
 
 Project site: https://20161302animesh.github.io/blog-writing-agent/ (landing page, [README](https://20161302animesh.github.io/blog-writing-agent/readme.html), [how it works](https://20161302animesh.github.io/blog-writing-agent/docs/how-it-works.html), and the [walkthrough](https://20161302animesh.github.io/blog-writing-agent/docs/walkthrough.html)).
