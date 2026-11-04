@@ -94,7 +94,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 section { display: flex; flex-direction: column; gap: 16px; }
 .sub { display: flex; flex-direction: column; gap: 12px; }
 .muted { color: var(--muted); }
-code { font-family: var(--mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
 pre code { background: none; padding: 0; font-size: inherit; }
 ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 
@@ -160,6 +160,7 @@ footer a { color: var(--muted); }
         <li><a href="#resume">Resumable runs</a></li>
         <li><a href="#integrations">Tools and Studio</a></li>
         <li><a href="#outputs">Outputs</a></li>
+        <li><a href="#tracing">Tracing</a></li>
         <li><a href="#layout">Project layout</a></li>
         <li><a href="#tests">Tests</a></li>
         <li><a href="#cost">Cost</a></li>
@@ -227,6 +228,9 @@ cp .env.example .env</pre>
               <tr><td><code>BLOG_AGENT_&lt;ROLE&gt;_MODEL</code></td><td>see below</td><td>Model for one role</td></tr>
               <tr><td><code>BLOG_AGENT_&lt;ROLE&gt;_MAX_TOKENS</code></td><td>see below</td><td>Output limit for one role, including thinking</td></tr>
               <tr><td><code>BLOG_AGENT_&lt;ROLE&gt;_EFFORT</code></td><td>model default</td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code> or <code>max</code></td></tr>
+              <tr><td><code>LANGSMITH_TRACING</code></td><td><code>false</code></td><td><code>true</code> sends each run to LangSmith (see <a href="#tracing">Tracing</a>)</td></tr>
+              <tr><td><code>LANGSMITH_API_KEY</code></td><td>none</td><td>Needed when tracing is on</td></tr>
+              <tr><td><code>LANGSMITH_PROJECT</code></td><td><code>default</code></td><td>LangSmith project for the traces</td></tr>
             </tbody>
           </table>
         </div>
@@ -306,6 +310,8 @@ print(result.title, result.output_path, result.estimated_cost_usd)</pre>
                 <tr><td><code>section_issues</code></td><td>Technical sections still failing their checks after a retry</td></tr>
                 <tr><td><code>warnings</code></td><td>Steps that failed but didn't stop the run</td></tr>
                 <tr><td><code>usage</code>, <code>estimated_cost_usd</code></td><td>Tokens per model, and an estimated cost</td></tr>
+                <tr><td><code>stages</code></td><td>One record per step: timing, model calls, tokens, cost, decisions, warnings and errors (see <a href="#tracing">Tracing</a>)</td></tr>
+                <tr><td><code>trace_id</code>, <code>trace_url</code></td><td>The run's LangSmith trace, when tracing is on</td></tr>
                 <tr><td><code>plan</code></td><td>The outline or thesis plan, as a dict</td></tr>
               </tbody>
             </table>
@@ -364,11 +370,44 @@ llm_with_tools = llm.bind_tools([tool])</pre>
               <tr><td><code>runs/&lt;run_id&gt;/NN_&lt;step&gt;.json</code></td><td>What each step changed, and the full state after it. Parallel writers appear as <code>05_worker_task01.json</code>, <code>05_worker_task02.json</code>, …</td></tr>
               <tr><td><code>v1_draft.md</code>, <code>v2_editor_revision.md</code>, <code>v3_final.md</code></td><td>The draft, the edited version and the final post</td></tr>
               <tr><td><code>diff_1_draft_to_editor.diff</code></td><td>Every sentence the editor or grounding check changed</td></tr>
+              <tr><td><code>stages.jsonl</code></td><td>One line per step, written as each step finishes: timing, model calls, tokens, cost, decisions, errors. A resumed run adds to it.</td></tr>
               <tr><td><code>final_state.json</code></td><td>Everything at the end of the run</td></tr>
               <tr><td><code>error.txt</code></td><td>Only if the run crashed: the error and where it happened</td></tr>
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section id="tracing" aria-labelledby="tracing-h">
+        <h2 id="tracing-h">Tracing</h2>
+        <p>Every step leaves a record of what it did, whether or not LangSmith is on. Each parallel section writer gets its own record.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Part</th><th>What it holds</th></tr></thead>
+            <tbody>
+              <tr><td>Timing</td><td>Start, end, duration, and the order the steps started in</td></tr>
+              <tr><td>Model calls</td><td>Role, the model that answered (after a refusal fallback this can differ from the configured one), input and output tokens, stop reason, duration and cost, plus totals for the step</td></tr>
+              <tr><td>Decisions</td><td>The classifier's reason, the router's mode and queries, results per search and how many each filter dropped, the plan's sections, each section's words and attempts, grounding fixes applied and rejected, editor issues, tags</td></tr>
+              <tr><td>Problems</td><td>The step's warnings, and the error if it failed</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The records are in <code>result.stages</code> and in <code>runs/&lt;run_id&gt;/stages.jsonl</code>. The file is written as each step finishes, so a crashed run shows where it stopped. The command line prints one row per step:</p>
+<pre>STAGES:
+   1 classify          0.0s  0 calls       0 in      0 out  $0.0000  ok
+   2 router            1.9s  1 calls     612 in     95 out  $0.0001  ok
+   ...</pre>
+        <div class="sub">
+          <h3>LangSmith</h3>
+          <p>Set <code>LANGSMITH_TRACING=true</code> and <code>LANGSMITH_API_KEY</code>, and each run becomes one trace. Its root run, <code>write_blog</code>, has the steps, model calls and searches under it.</p>
+          <ul class="plain">
+            <li>Every model call is tagged <code>role:&lt;role&gt;</code>, so token usage can be grouped by planner, writer, editor and so on.</li>
+            <li>Each step's run carries its record as <code>stage</code> metadata. The root run's output holds a table of all the steps, usage per model and the cost estimate.</li>
+            <li>The root run's metadata includes <code>blog_run_id</code>, the same id as the QA folder. A resumed run gets a second trace with the same id.</li>
+            <li>If LangSmith shows no cost for a model, add its price in LangSmith's model pricing settings.</li>
+          </ul>
+        </div>
+        <p class="muted">Steps get their record from the <code>@stage</code> decorator in <code>stages.py</code>. A new step only needs the decorator, and a step you call directly is recorded too.</p>
       </section>
 
       <section id="layout" aria-labelledby="layout-h">
@@ -388,6 +427,8 @@ llm_with_tools = llm.bind_tools([tool])</pre>
   graph.py              <span class="d">build_graph(): wires the steps together</span>
   qa.py                 <span class="d">Per-step snapshots, versions, diffs</span>
   checkpoint.py         <span class="d">sqlite_checkpointer() for resumable runs</span>
+  stages.py             <span class="d">@stage: per-step records of timing, model calls, decisions, errors</span>
+  tracing.py            <span class="d">Optional LangSmith trace per run</span>
   api.py                <span class="d">write_blog() and as_tool()</span>
   cli.py                <span class="d">python -m blog_agent</span>
 tests/                  <span class="d">offline tests with fake models and search</span>
@@ -407,7 +448,7 @@ blog_analysis_agent_v1.ipynb                              <span class="d">origin
 python -m pytest</pre>
           <button class="copy" type="button" data-target="c-tests">Copy</button>
         </div>
-        <p>The 18 tests run both branches end to end with fake models and fake search, so they need no API keys and cost nothing. They also cover the failure paths: search down, editor failing, old news being filtered out, and resuming a crashed run.</p>
+        <p>The 24 tests run both branches end to end with fake models and fake search, so they need no API keys and cost nothing. They also cover the failure paths: search down, editor failing, old news being filtered out, resuming a crashed run, the per-step records, and LangSmith tracing (with a stand-in client).</p>
       </section>
 
       <section id="cost" aria-labelledby="cost-h">
