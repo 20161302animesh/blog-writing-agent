@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from .llm import LLMError
 from .profiles import MAX_TAGS, PROFILES
 from .schemas import AnalysisPlan, BlogTags, KindDecision, Plan, RouterDecision
+from .stages import note, stage
 from .state import Deps, State
 from .utils import clean_tags, slugify, yaml_str
 
@@ -25,6 +26,7 @@ Pick the one that fits the request best.
 """
 
 
+@stage
 def classify_node(state: State, *, deps: Deps) -> dict:
     """Resolve kind="auto" and fill input defaults (so the graph also runs from LangGraph Studio)."""
     update: dict = {}
@@ -40,12 +42,16 @@ def classify_node(state: State, *, deps: Deps) -> dict:
             [SystemMessage(content=CLASSIFY_SYSTEM), HumanMessage(content=f"Request: {state['topic']}")],
         )
         kind = decision.kind
+        note(classified_by="classifier", reason=decision.reason)
+    else:
+        note(classified_by="caller")
     update["kind"] = kind
     return update
 
 
 # ---------- ROUTER ----------
 
+@stage
 def router_node(state: State, *, deps: Deps) -> dict:
     profile = PROFILES[state["kind"]]
     decision = deps.models.structured(
@@ -83,6 +89,7 @@ def _tagger_context(state: State) -> str:
     return ""
 
 
+@stage
 def tagger_node(state: State, *, deps: Deps) -> dict:
     profile = PROFILES[state["kind"]]
     try:
@@ -126,6 +133,7 @@ def front_matter(state: State) -> str:
     return "\n".join(lines) + "\n\n"
 
 
+@stage
 def save_node(state: State, *, deps: Deps) -> dict:
     if state.get("save") is False:
         return {"output_path": ""}

@@ -31,7 +31,7 @@ print(result.title, result.output_path, result.estimated_cost_usd)
 
 `kind="auto"` lets a classifier choose. A typical run costs $0.20–0.40.
 
-To trace runs and token usage in LangSmith, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` (see [blog_agent/README.md](blog_agent/README.md#trace-with-langsmith)).
+Each step of a run also leaves a record of its timing, model calls and tokens, cost, decisions and errors. The records are in `result.stages` and `runs/<run_id>/stages.jsonl`, and in LangSmith when tracing is on. To trace runs and token usage in LangSmith, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` (see [blog_agent/README.md](blog_agent/README.md#trace-with-langsmith)).
 
 ## Learn more
 

@@ -132,3 +132,40 @@ def test_resume_after_failure(settings, tmp_path, caplog):
     assert sum(c[1] == "AnalysisPlan" for c in models.calls) == planner_calls   # earlier nodes not re-run
     final = json.loads((settings.qa_dir / run_id / "final_state.json").read_text(encoding="utf-8"))
     assert final["plan"]["title"] == "Better Title"
+
+
+def test_stage_records(settings):
+    result = run(settings, FakeModels(), kind="technical")
+
+    stages = [s.stage for s in result.stages]
+    assert stages[:4] == ["classify", "router", "research", "orchestrator"]
+    assert stages.count("worker") == 2 and stages[-2:] == ["tagger", "save"]
+    assert [s.seq for s in result.stages] == list(range(1, len(stages) + 1))
+    assert all(s.status == "ok" and s.duration_s >= 0 for s in result.stages)
+
+    by_name = {s.stage: s for s in result.stages}
+    assert by_name["router"].decisions["mode"] == "hybrid"
+    research = by_name["research"].decisions
+    assert research["results_returned"] == 6 and research["dropped_not_from_search"] == 1
+    assert by_name["grounding"].decisions["fixes_applied"] == 1
+    assert by_name["grounding"].decisions["fixes_rejected"] == 2
+    # The broken section took a retry; its two writer calls are counted on that worker only
+    first = next(s for s in result.stages if s.stage == "worker" and s.decisions["task_id"] == 1)
+    assert first.decisions["attempts"] == 2 and len(first.llm_calls) == 2
+    assert first.input_tokens == 200 and first.cost_usd is not None
+    assert by_name["classify"].llm_calls == []          # explicit kind: no classifier call
+
+    lines = (settings.qa_dir / result.run_id / "stages.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == len(stages)
+
+
+def test_failed_stage_is_recorded(settings):
+    models = FakeModels(structured={"Plan": raising("planner exploded")})
+    with pytest.raises(Exception):
+        run(settings, models, kind="technical")
+
+    from blog_agent.stages import load_stages
+    run_dir = next((settings.qa_dir).iterdir())
+    stages = load_stages(run_dir / "stages.jsonl")
+    assert stages[-1].stage == "orchestrator" and stages[-1].status == "error"
+    assert "planner exploded" in stages[-1].error

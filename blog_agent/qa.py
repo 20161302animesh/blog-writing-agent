@@ -2,6 +2,7 @@
 
 Layout of runs/<run_id>/:
     00_input.json, NN_<node>.json (update + state_after), final_state.json
+    stages.jsonl (one StageRecord per step, written by stages.py as each step finishes)
     v1_draft.md, v2_editor_revision.md, v3_final.md
     diff_1_draft_to_editor.diff, diff_2_editor_to_final.diff
 """

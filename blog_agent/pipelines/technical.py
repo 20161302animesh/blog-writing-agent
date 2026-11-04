@@ -8,6 +8,7 @@ from langgraph.types import Send
 
 from ..llm import LLMError
 from ..schemas import EvidenceItem, GroundingReport, Plan, Task
+from ..stages import note, stage
 from ..state import Deps, State
 from ..utils import check_markdown, evidence_block, urls_in, valid_ids
 
@@ -52,6 +53,7 @@ Output must strictly match the Plan schema.
 """
 
 
+@stage
 def orchestrator_node(state: State, *, deps: Deps) -> dict:
     evidence = state.get("evidence", [])
     mode = state.get("mode", "closed_book")
@@ -150,6 +152,7 @@ Style:
 """
 
 
+@stage
 def worker_node(payload: dict, *, deps: Deps) -> dict:
     task = Task(**payload["task"])
     plan = Plan(**payload["plan"])
@@ -183,7 +186,8 @@ def worker_node(payload: dict, *, deps: Deps) -> dict:
     feedback = ""
     problems: List[str] = []
     section_md = ""
-    for _ in range(1 + deps.settings.worker_retries):
+    for attempt in range(1, 2 + deps.settings.worker_retries):
+        note(attempts=attempt)
         section_md, meta = deps.models.text(
             "writer", [SystemMessage(content=WORKER_SYSTEM), HumanMessage(content=prompt + feedback)]
         )
@@ -208,6 +212,7 @@ def worker_node(payload: dict, *, deps: Deps) -> dict:
 
 # ---------- REDUCER ----------
 
+@stage
 def reducer_node(state: State) -> dict:
     plan: Plan = state["plan"]
     # Keep only the latest section per task id (a resumed run can append a task twice)
@@ -245,6 +250,7 @@ Return an empty list if every claim checks out.
 """
 
 
+@stage
 def grounding_node(state: State, *, deps: Deps) -> dict:
     evidence = state.get("evidence", [])
     if not deps.settings.grounding_check or not evidence:

@@ -9,6 +9,7 @@ import sys
 
 from .api import write_blog
 from .config import Settings
+from .stages import stage_table
 
 
 def _summary(result) -> str:
@@ -28,6 +29,13 @@ def _summary(result) -> str:
     if result.warnings:
         lines.append("WARNINGS:")
         lines += [f"  - {w}" for w in result.warnings]
+    if result.stages:
+        lines.append("STAGES:")
+        for row in stage_table(result.stages):
+            cost = f"${row['cost_usd']:.4f}" if row["cost_usd"] is not None else "$?"
+            lines.append(f"  {row['seq'] or '':>2} {row['stage']:<13} {row['duration_s']:>7.1f}s "
+                         f"{row['llm_calls']:>2} calls {row['input_tokens']:>7} in {row['output_tokens']:>6} out "
+                         f"{cost:>8}  {row['status']}")
     tokens = {m: (u.get("input_tokens", 0), u.get("output_tokens", 0)) for m, u in result.usage.items()}
     lines.append(f"TOKENS (in, out): {tokens}")
     if result.estimated_cost_usd is not None:

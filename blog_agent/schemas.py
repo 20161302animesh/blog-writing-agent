@@ -115,6 +115,35 @@ class EditResult(BaseModel):
 
 # ---------- public result ----------
 
+class LLMCall(BaseModel):
+    role: str
+    model: str = Field(..., description="Model that answered (can differ from the configured one after a fallback).")
+    input_tokens: int = 0
+    output_tokens: int = 0
+    stop_reason: Optional[str] = None
+    duration_s: float = 0.0
+    cost_usd: Optional[float] = None
+    error: Optional[str] = None
+
+
+class StageRecord(BaseModel):
+    """What one step of the workflow did: timing, model calls, decisions, warnings, errors."""
+    stage: str
+    seq: Optional[int] = Field(None, description="Start order within this call (1, 2, ...).")
+    started_at: str
+    ended_at: str
+    duration_s: float
+    status: Literal["ok", "error"] = "ok"
+    llm_calls: List[LLMCall] = Field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: Optional[float] = None
+    decisions: dict = Field(default_factory=dict)
+    warnings: List[str] = Field(default_factory=list)
+    error: Optional[str] = None
+    langsmith_run_id: Optional[str] = None
+
+
 class BlogResult(BaseModel):
     run_id: str
     kind: Kind
@@ -131,6 +160,7 @@ class BlogResult(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     usage: Dict[str, Dict[str, int]] = Field(default_factory=dict, description="Token usage per model.")
     estimated_cost_usd: Optional[float] = None
+    stages: List[StageRecord] = Field(default_factory=list, description="One record per step, in start order.")
     trace_id: Optional[str] = Field(None, description="LangSmith trace id, when tracing is on.")
     trace_url: Optional[str] = None
     plan: dict = Field(default_factory=dict)

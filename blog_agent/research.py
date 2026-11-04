@@ -11,6 +11,7 @@ from langchain_tavily import TavilySearch
 from .llm import LLMError
 from .profiles import PROFILES
 from .schemas import EvidencePack
+from .stages import note, stage
 from .state import Deps, State
 from .utils import is_blocked, iso_to_date
 
@@ -43,6 +44,7 @@ def tavily_search(query: str, max_results: int = 5, topic: str = "general",
     return normalized
 
 
+@stage
 def research_node(state: State, *, deps: Deps) -> dict:
     profile = PROFILES[state["kind"]]
     queries = (state.get("queries") or [])[: profile.max_queries]
@@ -50,20 +52,26 @@ def research_node(state: State, *, deps: Deps) -> dict:
     topic = "news" if mode == "open_book" else "general"   # "news" returns published dates
     time_range = TIME_RANGE.get(mode)
     warnings: List[str] = []
+    searches: List[dict] = []
 
     def run_query(q: str) -> List[dict]:
         try:
-            return deps.search(q, profile.results_per_query, topic, time_range)
+            results = deps.search(q, profile.results_per_query, topic, time_range)
+            searches.append({"query": q, "results": len(results)})
+            return results
         except Exception as e:   # one failed query shouldn't sink the run
             warnings.append(f"search failed for {q!r}: {e}")
+            searches.append({"query": q, "results": 0, "error": str(e)})
             return []
 
     # Context-copying pool, so the searches stay inside this node's trace
     with ContextThreadPoolExecutor(max_workers=max(1, deps.settings.search_concurrency)) as pool:
         raw_results = [r for batch in pool.map(run_query, queries) for r in batch]
+    note(topic=topic, time_range=time_range, searches=searches, results_returned=len(raw_results))
 
     # Enforce source rules in code, before the LLM sees anything
     raw_results = [r for r in raw_results if r.get("url") and not is_blocked(r["url"])]
+    note(results_after_blocklist=len(raw_results))
     if not raw_results:
         if queries:
             warnings.append("research returned no usable results; writing without evidence")
@@ -92,11 +100,14 @@ def research_node(state: State, *, deps: Deps) -> dict:
     # Only keep URLs that search actually returned (the extractor can't invent sources)
     dedup = {e.url: e for e in pack.evidence if e.url in raw_by_url and not is_blocked(e.url)}
     evidence = list(dedup.values())
+    note(extracted=len(pack.evidence), dropped_not_from_search=len(pack.evidence) - len(evidence))
 
     # Drop items known to be too old; keep undated ones (time_range already filtered at search)
     if mode == "open_book":
         cutoff = date.fromisoformat(state["as_of"]) - timedelta(days=int(state["recency_days"]))
+        before = len(evidence)
         evidence = [e for e in evidence if (d := iso_to_date(e.published_at)) is None or d >= cutoff]
+        note(dropped_too_old=before - len(evidence))
 
     evidence = evidence[: deps.settings.max_evidence]
     return {

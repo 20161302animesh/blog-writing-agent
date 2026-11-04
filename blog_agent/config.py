@@ -43,6 +43,15 @@ PRICES: Dict[str, tuple[float, float]] = {
     "claude-opus-5-5": (4.00, 20.00),
 }
 
+
+def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> Optional[float]:
+    """USD estimate from PRICES, or None for a model without a price."""
+    if model not in PRICES:
+        return None
+    p_in, p_out = PRICES[model]
+    return input_tokens / 1e6 * p_in + output_tokens / 1e6 * p_out
+
+
 # Models that accept the server-side refusal fallback ("fallbacks": "default")
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
 

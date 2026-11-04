@@ -9,10 +9,11 @@ from typing import List, Literal, Optional
 
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 
-from .config import PRICES, Settings
+from .config import Settings, estimate_cost
 from .graph import build_graph
 from .qa import RunRecorder
 from .schemas import BlogResult
+from .stages import StageLedger, stage_table
 from .state import SearchFn
 from .tracing import finish_trace, run_trace
 from .utils import slugify
@@ -25,14 +26,8 @@ def _usage_summary(handler: UsageMetadataCallbackHandler):
         model: {k: int(v) for k, v in u.items() if isinstance(v, (int, float))}
         for model, u in handler.usage_metadata.items()
     }
-    cost, known = 0.0, True
-    for model, u in usage.items():
-        if model not in PRICES:
-            known = False
-            continue
-        p_in, p_out = PRICES[model]
-        cost += u.get("input_tokens", 0) / 1e6 * p_in + u.get("output_tokens", 0) / 1e6 * p_out
-    return usage, (round(cost, 4) if known else None)
+    costs = [estimate_cost(model, u.get("input_tokens", 0), u.get("output_tokens", 0)) for model, u in usage.items()]
+    return usage, (round(sum(costs), 4) if None not in costs else None)
 
 
 def write_blog(
@@ -93,6 +88,7 @@ def write_blog(
         "run_name": f"blog_agent:{run_id}",
     }
     recorder = RunRecorder(Path(settings.qa_dir) / run_id) if qa else None
+    ledger = StageLedger(recorder.run_dir / "stages.jsonl" if recorder else None)
 
     # LangSmith: one trace per call, findable by blog_run_id (a resumed run gets a second trace)
     trace_meta = {
@@ -106,7 +102,7 @@ def write_blog(
 
     state: Optional[dict] = None
     pending: List[tuple] = []
-    with run_trace(trace_inputs, trace_meta, tags=["blog_agent"]) as rt:
+    with run_trace(trace_inputs, trace_meta, tags=["blog_agent"]) as rt, ledger.active():
         try:
             for mode, chunk in app.stream(graph_input, config=config, stream_mode=["updates", "values"]):
                 if mode == "updates":
@@ -125,7 +121,8 @@ def write_blog(
 
         usage, cost = _usage_summary(usage_handler)
         if rt is not None:
-            rt.add_outputs({"title": (state or {}).get("title"), "usage": usage, "estimated_cost_usd": cost})
+            rt.add_outputs({"title": (state or {}).get("title"), "usage": usage, "estimated_cost_usd": cost,
+                            "stages": stage_table(ledger.ordered())})
     trace_url = finish_trace(rt)
 
     if state is None or not state.get("final"):
@@ -149,6 +146,7 @@ def write_blog(
         warnings=state.get("warnings", []),
         usage=usage,
         estimated_cost_usd=cost,
+        stages=ledger.ordered(),
         trace_id=str(rt.trace_id) if rt is not None else None,
         trace_url=trace_url,
         plan=state["plan"].model_dump() if state.get("plan") is not None else {},

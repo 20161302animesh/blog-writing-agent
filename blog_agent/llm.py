@@ -6,6 +6,7 @@ and lets tests swap in a fake with the same two methods.
 """
 from __future__ import annotations
 
+import time
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
 from langchain_anthropic import ChatAnthropic
@@ -13,6 +14,7 @@ from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
 from .config import FALLBACK_MODELS, Settings
+from .stages import record_llm_call
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -59,9 +61,20 @@ class Models:
             self._cache[role] = ChatAnthropic(**kwargs)
         return self._cache[role]
 
+    def _invoke(self, role: str, runnable, messages: List[BaseMessage], raw=lambda out: out):
+        """Invoke and report the call (tokens, stop_reason, timing) to the running stage."""
+        started = time.perf_counter()
+        try:
+            out = runnable.invoke(messages)
+        except Exception as e:
+            record_llm_call(role, self.settings.models[role].model, None, started, error=f"{type(e).__name__}: {e}")
+            raise
+        record_llm_call(role, self.settings.models[role].model, raw(out), started)
+        return out
+
     def structured(self, role: str, schema: Type[T], messages: List[BaseMessage]) -> T:
         runnable = self.get(role).with_structured_output(schema, method="json_schema", include_raw=True)
-        out = runnable.invoke(messages)
+        out = self._invoke(role, runnable, messages, raw=lambda o: o.get("raw"))
         problem = stop_problem(getattr(out.get("raw"), "response_metadata", None))
         if problem:
             raise LLMError(f"{role} ({schema.__name__}): {problem}")
@@ -71,5 +84,5 @@ class Models:
 
     def text(self, role: str, messages: List[BaseMessage]) -> Tuple[str, dict]:
         """Plain text response plus its response_metadata (callers decide how to treat stop_reason)."""
-        resp = self.get(role).invoke(messages)
+        resp = self._invoke(role, self.get(role), messages)
         return resp.text.strip(), resp.response_metadata

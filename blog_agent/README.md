@@ -42,6 +42,32 @@ python -m blog_agent --help
 | `BLOG_AGENT_GROUNDING_CHECK` | `false` to skip the technical grounding check |
 | `BLOG_AGENT_REFUSAL_FALLBACKS` | `false` to turn off server-side refusal fallback on Sonnet/Opus |
 
+## Stage records
+
+Every step of the workflow leaves a `StageRecord`, whether or not LangSmith is on. Each step function is decorated with `@stage` (from `stages.py`), so a new step only needs the decorator. That also covers steps you call directly, as the walkthrough does. Each section writer gets its own record. A record holds:
+
+- **Timing:** `started_at`, `ended_at`, `duration_s`, and `seq` (start order).
+- **Model calls:** each call's role, the model that answered (after a refusal fallback this can differ from the configured model), input and output tokens, stop reason, duration and estimated cost. The record also sums these.
+- **Decisions:** what the step decided. Examples: the classifier's reason, the router's mode and queries, results per search query and how many each filter dropped, the plan's tasks, a section's word count and number of attempts, grounding fixes applied and rejected, the editor's issues, and the tags.
+- **Problems:** the warnings the step raised, and `status="error"` with the error message if it failed.
+
+The records are in three places:
+
+| Where | What |
+|---|---|
+| `BlogResult.stages` | The records for this call, in start order. |
+| `runs/<run_id>/stages.jsonl` | One line per step, written as each step finishes, so a failed run shows how far it got. A resumed run appends to the same file. Read it back with `blog_agent.stages.load_stages(path)`. |
+| LangSmith (when tracing is on) | Each step's run gets its record as `stage` metadata, and the root run's outputs include a one-row-per-step table. |
+
+The CLI prints the same table after each run:
+
+```
+STAGES:
+   1 classify          0.0s  0 calls       0 in      0 out  $0.0000  ok
+   2 router            1.9s  1 calls     612 in     95 out  $0.0001  ok
+   ...
+```
+
 ## Trace with LangSmith
 
 Tracing is off by default. To send each run to LangSmith, set:
@@ -73,6 +99,7 @@ Each `write_blog()` call becomes one trace. It has a root run named `write_blog`
 | `graph.py` | `build_graph()` |
 | `qa.py` | Per-node snapshots, versions, diffs |
 | `checkpoint.py` | `sqlite_checkpointer()` for resumable runs |
+| `stages.py` | Per-step records: timing, model calls, decisions, errors |
 | `tracing.py` | Optional LangSmith root run per call |
 | `api.py` | `write_blog()`, `as_tool()` |
 | `cli.py` | Command line |

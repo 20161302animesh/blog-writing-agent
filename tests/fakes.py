@@ -4,11 +4,14 @@ from __future__ import annotations
 import threading
 from typing import Callable, Dict, List, Optional
 
+from langchain_core.messages import AIMessage
+
 from blog_agent.llm import LLMError
 from blog_agent.schemas import (
     AnalysisPlan, Beat, BlogTags, EditResult, EvidenceItem, EvidencePack, GroundingFix, GroundingReport,
     KindDecision, Plan, RouterDecision, Task,
 )
+from blog_agent.stages import record_llm_call
 
 URL_A = "https://example.com/report-a"
 URL_B = "https://news.example.org/story-b"
@@ -57,6 +60,16 @@ def default_structured() -> Dict[str, Callable]:
     }
 
 
+FAKE_USAGE = {"input_tokens": 100, "output_tokens": 10, "total_tokens": 110}
+
+
+def _report(role):
+    """Report a call to the running stage the way Models does, with fixed usage."""
+    msg = AIMessage(content="", usage_metadata=FAKE_USAGE,
+                    response_metadata={"model_name": "claude-haiku-5-5", "stop_reason": "end_turn"})
+    record_llm_call(role, "claude-haiku-5-5", msg)
+
+
 class FakeModels:
     def __init__(self, structured: Optional[Dict[str, Callable]] = None, text: Optional[Dict[str, Callable]] = None):
         self._structured = {**default_structured(), **(structured or {})}
@@ -67,6 +80,7 @@ class FakeModels:
     def structured(self, role, schema, messages):
         with self._lock:
             self.calls.append((role, schema.__name__, messages))
+        _report(role)
         value = self._structured[schema.__name__]()
         if isinstance(value, Exception):
             raise value
@@ -75,6 +89,7 @@ class FakeModels:
     def text(self, role, messages):
         with self._lock:
             self.calls.append((role, "text", messages))
+        _report(role)
         prompt = messages[-1].content
         if role in self._text:
             return self._text[role](prompt)

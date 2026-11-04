@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..llm import LLMError, stop_problem
 from ..schemas import AnalysisPlan, EditResult, EvidenceItem
+from ..stages import stage
 from ..state import Deps, State
 from ..utils import evidence_block, prose_word_count, valid_ids
 
@@ -38,6 +39,7 @@ Avoid:
 """
 
 
+@stage
 def planner_node(state: State, *, deps: Deps) -> dict:
     target = state.get("target_words")
     evidence = state.get("evidence", [])
@@ -114,6 +116,7 @@ def plan_text(plan: AnalysisPlan, evidence: List[EvidenceItem],
     )
 
 
+@stage
 def writer_node(state: State, *, deps: Deps) -> dict:
     plan: AnalysisPlan = state["plan"]
     draft, meta = deps.models.text(
@@ -157,6 +160,7 @@ LENGTH_SYSTEM = ("Adjust this piece's length. Keep the argument, voice, facts an
                  "Return only the Markdown body, no title.")
 
 
+@stage
 def editor_node(state: State, *, deps: Deps) -> dict:
     plan: AnalysisPlan = state["plan"]
     warnings: List[str] = []
